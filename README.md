@@ -1,10 +1,10 @@
-# 🐷 Porquinho WhatsApp - Bot Financeiro Pessoal
+# Porquinho WhatsApp - Bot Financeiro Pessoal
 
 Backend de automação para controle financeiro pessoal integrado ao WhatsApp utilizando a **API Oficial da Meta (Cloud API)** e banco de dados **Supabase (PostgreSQL)**.
 
 ---
 
-## 🚀 Stack Tecnológica
+## Stack Tecnológica
 * **Linguagem:** Python 3 + FastAPI
 * **Servidor Web:** Uvicorn (Assíncrono)
 * **WhatsApp:** Meta Cloud API (Webhooks & Graph API)
@@ -12,7 +12,7 @@ Backend de automação para controle financeiro pessoal integrado ao WhatsApp ut
 
 ---
 
-## ✨ Funcionalidades
+## Funcionalidades
 1. **Verificação de Webhook:** Autenticação automática via `GET /webhook` compatível com o desafio (`hub.challenge`) da Meta Developers.
 2. **Registro de Gastos:** Identificação automática de comandos que iniciam com `gasto` (ex: `gasto 50 almoço`). O bot extrai o valor, categoriza e salva no banco de dados.
 3. **Registro de Entradas:** Identificação automática de comandos que iniciam com `entrada` (ex: `entrada 100 pix`).
@@ -21,7 +21,7 @@ Backend de automação para controle financeiro pessoal integrado ao WhatsApp ut
 
 ---
 
-## 📋 Como Configurar
+## Como Configurar
 
 ### 1. Banco de Dados (Supabase)
 Abra o **SQL Editor** no painel do seu projeto no Supabase e execute o conteúdo do arquivo `schema.sql` para criar a tabela `financas_transacoes` com as políticas de segurança.

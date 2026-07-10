@@ -263,8 +263,17 @@ async def receber_mensagens_green(request: Request):
             chat_id = str(sender_data.get("chatId", sender_data.get("sender", "")))
             chat_name = str(sender_data.get("chatName", "")).strip()
 
-            # TRAVA DE SEGURANÇA: Se for mensagem de grupo (@g.us), só processa se o nome for compatível com GRUPO_PERMITIDO
-            if "@g.us" in chat_id and GRUPO_PERMITIDO:
+            # =========================================================================
+            # BLINDAGEM TOTAL DE SEGURANÇA (TOTAL LOCKDOWN)
+            # =========================================================================
+            # Se GRUPO_PERMITIDO estiver configurado (ex: 'Finanças'), o bot NUNCA
+            # processa nem responde conversas privadas (@c.us) nem outros grupos.
+            # SÓ PROCESSA e RESPONDE dentro do grupo (@g.us) autorizado.
+            if GRUPO_PERMITIDO:
+                if "@g.us" not in chat_id:
+                    print(f"[SEGURANÇA BLINDADA] Conversa privada '{chat_id}' ignorada. Permitido apenas o grupo '{GRUPO_PERMITIDO}'.")
+                    return Response(status_code=status.HTTP_200_OK)
+
                 import unicodedata
                 def remover_acentos(txt: str) -> str:
                     return ''.join(c for c in unicodedata.normalize('NFD', txt) if unicodedata.category(c) != 'Mn').lower()
@@ -273,7 +282,7 @@ async def receber_mensagens_green(request: Request):
                 nome_permitido_limpo = remover_acentos(GRUPO_PERMITIDO)
 
                 if nome_permitido_limpo not in nome_recebido_limpo and nome_recebido_limpo not in nome_permitido_limpo:
-                    print(f"[SEGURANÇA] Mensagem do grupo '{chat_name}' ignorada. Permitido apenas: '{GRUPO_PERMITIDO}'.")
+                    print(f"[SEGURANÇA BLINDADA] Grupo '{chat_name}' ignorado. Permitido apenas: '{GRUPO_PERMITIDO}'.")
                     return Response(status_code=status.HTTP_200_OK)
 
             texto = payload.get("messageData", {}).get("textMessageData", {}).get("textMessage", "").strip()

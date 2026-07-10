@@ -102,13 +102,14 @@ Garantir que os seguintes formatos sejam reconhecidos corretamente:
   3. Como consultar o saldo e o relatório do mês (`gere o relatorio do mes`).
   4. Dicas de categorias automáticas.
 
-### ☁️ Atividade 2: Publicação e Hospedagem 24/7 na Nuvem (Render / Railway)
-- **Objetivo:** Publicar o backend FastAPI em uma plataforma de nuvem gratuita (ex: Render, Railway ou Koyeb) para que o Porquinho funcione 24 horas por dia, 7 dias por semana.
+### ☁️ [CONCLUÍDO - RENDER.COM] Atividade 2: Publicação e Hospedagem 24/7 na Nuvem
+- **Status:** Concluído com sucesso no Render.com (URL oficial conectada com Webhook da Meta e Token Permanente).
+- **Objetivo:** Publicar o backend FastAPI em uma plataforma de nuvem gratuita para que o Porquinho funcione 24 horas por dia, 7 dias por semana.
 - **Entregáveis da Atividade:**
-  1. Criação do arquivo `Procfile` ou configuração de `start command` (`uvicorn main:app --host 0.0.0.0 --port $PORT`).
-  2. Configuração segura das variáveis de ambiente (`.env`) no painel da nuvem.
-  3. Substituição da URL do túnel temporário (`cloudflared`) pela URL HTTPS oficial definitiva no Webhook da Meta.
-  4. Teste de funcionamento com o computador local 100% desligado.
+  1. ✅ Criação do arquivo `Procfile` e comando de inicialização.
+  2. ✅ Configuração segura das variáveis de ambiente (`.env`) no painel do Render.
+  3. ✅ Substituição da URL do túnel temporário pela URL HTTPS oficial definitiva (`porquinhowhatsapp.onrender.com/webhook`).
+  4. ✅ Funcionamento 24/7 autônomo.
 
 ### 📊 Atividade 3: Dashboard Financeiro Web Visual (Gráficos e Extrato no Navegador)
 - **Objetivo:** Criar uma interface web moderna, visual e responsiva servida pelo próprio FastAPI (ex: `/dashboard`) para o usuário visualizar suas finanças em gráficos e extratos.

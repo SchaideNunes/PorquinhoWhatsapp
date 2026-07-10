@@ -41,6 +41,10 @@ EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "").strip().rstrip("/")
 EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY", "").strip()
 EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "").strip()
 
+# Configurações para Green API (WhatsApp QR Code Cloud Gratuito)
+GREEN_API_ID = os.getenv("GREEN_API_ID", "").strip()
+GREEN_API_TOKEN = os.getenv("GREEN_API_TOKEN", "").strip()
+
 # Validação inicial básica
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("[AVISO] As credenciais do Supabase não foram preenchidas no arquivo .env.")
@@ -85,7 +89,23 @@ async def enviar_mensagem_whatsapp(numero_destino: str, texto_mensagem: str) -> 
     Prioriza a Evolution API (WhatsApp Não-Oficial via QR Code) se configurada.
     Caso contrário, utiliza a API Oficial da Meta (Cloud API).
     """
-    # 1. Envio via Evolution API
+    # 1. Envio via Green API (Grátis QR Code Cloud)
+    if GREEN_API_ID and GREEN_API_TOKEN:
+        url = f"https://api.green-api.com/waInstance{GREEN_API_ID}/sendMessage/{GREEN_API_TOKEN}"
+        chat_id = f"{numero_destino}@c.us" if "@" not in numero_destino else numero_destino
+        payload = {"chatId": chat_id, "message": texto_mensagem}
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(url, json=payload, timeout=10.0)
+                if response.status_code in [200, 201]:
+                    print(f"[OK] Mensagem enviada via Green API para {numero_destino}.")
+                    return True
+                else:
+                    print(f"[ERRO] Erro ao enviar via Green API ({response.status_code}): {response.text}")
+            except Exception as e:
+                print(f"[ERRO] Exceção na Green API: {e}")
+
+    # 2. Envio via Evolution API
     if EVOLUTION_API_URL and EVOLUTION_API_KEY and EVOLUTION_INSTANCE:
         url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE}"
         headers = {
@@ -220,6 +240,32 @@ async def verificar_webhook_meta(request: Request):
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Token de verificação inválido ou modo incorreto."
     )
+
+
+@app.post("/webhook-green")
+async def receber_mensagens_green(request: Request):
+    """
+    ROTA POST /webhook-green:
+    Recebe eventos de mensagens recebidas da Green API (WhatsApp via QR Code em Nuvem).
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return Response(status_code=status.HTTP_200_OK)
+
+    try:
+        if payload.get("typeWebhook") == "incomingMessageReceived":
+            sender = payload.get("senderData", {}).get("sender", "")
+            numero_remetente = sender.split("@")[0]
+            texto = payload.get("messageData", {}).get("textMessageData", {}).get("textMessage", "").strip()
+            if not texto:
+                texto = payload.get("messageData", {}).get("extendedTextMessageData", {}).get("text", "").strip()
+            if texto and numero_remetente:
+                await processar_mensagem_usuario(numero_remetente, texto)
+    except Exception as e:
+        print(f"[ERRO] Erro no webhook Green API: {e}")
+
+    return Response(status_code=status.HTTP_200_OK)
 
 
 @app.post("/webhook-evolution")

@@ -109,3 +109,11 @@ Garantir que os seguintes formatos sejam reconhecidos corretamente:
   2. Configuração segura das variáveis de ambiente (`.env`) no painel da nuvem.
   3. Substituição da URL do túnel temporário (`cloudflared`) pela URL HTTPS oficial definitiva no Webhook da Meta.
   4. Teste de funcionamento com o computador local 100% desligado.
+
+### 📊 Atividade 3: Dashboard Financeiro Web Visual (Gráficos e Extrato no Navegador)
+- **Objetivo:** Criar uma interface web moderna, visual e responsiva servida pelo próprio FastAPI (ex: `/dashboard`) para o usuário visualizar suas finanças em gráficos e extratos.
+- **Entregáveis da Atividade:**
+  1. Página HTML + Vanilla CSS com design moderno (Modo Escuro premium / Glassmorphism / Cores vibrantes).
+  2. Cards com resumo de Entradas, Gastos e Saldo em tempo real.
+  3. Gráfico visual (ex: Chart.js) mostrando a divisão de gastos por categoria.
+  4. Tabela interativa com histórico recente de transações (somente leitura na tabela `financas_transacoes`).

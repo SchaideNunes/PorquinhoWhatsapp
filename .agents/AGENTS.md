@@ -11,4 +11,4 @@ Sempre que você (IA / Agente) iniciar uma conversa ou for realizar qualquer mod
 3. **EXECUTE A BATERIA DE TESTES OBRIGATÓRIOS:**
    - Antes de concluir qualquer tarefa, valide os itens listados na seção **Bateria de Testes Obrigatórios** do documento `DOCUMENTACAO_E_TESTES.md`.
 4. **CONSULTE O ROADMAP:**
-   - Verifique a seção de próximas atividades programadas (ex: criação do comando `HELP` / `ajuda` pelo WhatsApp e publicação 24/7 em nuvem).
+   - Verifique a seção de próximas atividades programadas (ex: criação do comando `HELP` / `ajuda` pelo WhatsApp, publicação 24/7 em nuvem e criação do Dashboard Financeiro Web Visual).

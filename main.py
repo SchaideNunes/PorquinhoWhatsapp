@@ -328,9 +328,10 @@ async def inserir_transacao(numero: str, dados: Dict[str, Any]):
         if resposta_db.data:
             icon_tipo = "🔴" if dados["tipo"] == "gasto" else "🟢"
             tipo_formatado = "Gasto" if dados["tipo"] == "gasto" else "Entrada"
+            adicionado_str = "adicionado" if dados["tipo"] == "gasto" else "adicionada"
             
             msg_sucesso = (
-                f"✅ *{tipo_formatado} registrado com sucesso!*\n\n"
+                f"✅ *{tipo_formatado} de {formatar_moeda(dados['valor'])} {adicionado_str} com sucesso!*\n\n"
                 f"{icon_tipo} *Tipo:* {tipo_formatado}\n"
                 f"💵 *Valor:* {formatar_moeda(dados['valor'])}\n"
                 f"🏷️ *Categoria:* {dados['categoria']}\n"

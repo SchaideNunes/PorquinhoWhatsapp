@@ -44,6 +44,7 @@ EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "").strip()
 # Configurações para Green API (WhatsApp QR Code Cloud Gratuito)
 GREEN_API_ID = os.getenv("GREEN_API_ID", "").strip()
 GREEN_API_TOKEN = os.getenv("GREEN_API_TOKEN", "").strip()
+GRUPO_PERMITIDO = os.getenv("GRUPO_PERMITIDO", "Finanças").strip()
 
 # Validação inicial básica
 if not SUPABASE_URL or not SUPABASE_KEY:
@@ -256,8 +257,15 @@ async def receber_mensagens_green(request: Request):
     try:
         if payload.get("typeWebhook") == "incomingMessageReceived":
             sender_data = payload.get("senderData", {})
-            # Se for grupo, chatId termina em @g.us; se for individual, @c.us
-            chat_id = sender_data.get("chatId", sender_data.get("sender", ""))
+            chat_id = str(sender_data.get("chatId", sender_data.get("sender", "")))
+            chat_name = str(sender_data.get("chatName", "")).strip()
+
+            # TRAVA DE SEGURANÇA: Se for mensagem de grupo (@g.us), só processa se o nome for exatamente o GRUPO_PERMITIDO
+            if "@g.us" in chat_id and GRUPO_PERMITIDO:
+                if chat_name.lower() != GRUPO_PERMITIDO.lower():
+                    print(f"[SEGURANÇA] Mensagem do grupo '{chat_name}' ignorada. Permitido apenas: '{GRUPO_PERMITIDO}'.")
+                    return Response(status_code=status.HTTP_200_OK)
+
             texto = payload.get("messageData", {}).get("textMessageData", {}).get("textMessage", "").strip()
             if not texto:
                 texto = payload.get("messageData", {}).get("extendedTextMessageData", {}).get("text", "").strip()

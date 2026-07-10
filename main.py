@@ -44,7 +44,7 @@ EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "").strip()
 # Configurações para Green API (WhatsApp QR Code Cloud Gratuito)
 GREEN_API_ID = os.getenv("GREEN_API_ID", "").strip()
 GREEN_API_TOKEN = os.getenv("GREEN_API_TOKEN", "").strip()
-GRUPO_PERMITIDO = os.getenv("GRUPO_PERMITIDO", "Finanças").strip()
+GRUPO_PERMITIDO = os.getenv("GRUPO_PERMITIDO", "").strip()
 
 # Validação inicial básica
 if not SUPABASE_URL or not SUPABASE_KEY:

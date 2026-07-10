@@ -129,8 +129,16 @@ def extrair_dados_transacao(texto_mensagem: str):
     if len(partes) < 2:
         return None
         
-    tipo = partes[0].lower()
-    if tipo not in ["gasto", "entrada"]:
+    tipo_raw = partes[0].lower()
+    
+    sinonimos_gasto = ["gasto", "gastei", "gastar", "saida", "saída", "paguei"]
+    sinonimos_entrada = ["entrada", "entrei", "recebi", "ganhei", "deposito", "depósito"]
+    
+    if tipo_raw in sinonimos_gasto:
+        tipo = "gasto"
+    elif tipo_raw in sinonimos_entrada:
+        tipo = "entrada"
+    else:
         return None
         
     # Tratamento do valor monetário (substitui vírgula por ponto para conversão)
@@ -253,7 +261,12 @@ async def processar_mensagem_usuario(numero: str, texto: str):
     # -------------------------------------------------------------------------------------
     # CASO 2: INSERÇÃO DE GASTO OU ENTRADA
     # -------------------------------------------------------------------------------------
-    if texto_normalizado.startswith("gasto") or texto_normalizado.startswith("entrada"):
+    primeira_palavra = texto_normalizado.split()[0] if texto_normalizado.split() else ""
+    gatilhos_transacao = [
+        "gasto", "gastei", "gastar", "saida", "saída", "paguei",
+        "entrada", "entrei", "recebi", "ganhei", "deposito", "depósito"
+    ]
+    if primeira_palavra in gatilhos_transacao:
         dados_transacao = extrair_dados_transacao(texto)
         
         if not dados_transacao:

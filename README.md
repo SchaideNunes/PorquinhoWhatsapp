@@ -1,5 +1,7 @@
 # Porquinho WhatsApp - Bot Financeiro Pessoal
 
+> 📘 **Atenção (IAs e Desenvolvedores):** Consulte o arquivo [DOCUMENTACAO_E_TESTES.md](file:///d:/Trabalho/Porquinho%20Whatsapp/DOCUMENTACAO_E_TESTES.md) para ver a arquitetura completa, regras inegociáveis de negócio, bateria de testes obrigatórios e roadmap de próximas atividades.
+
 Backend de automação para controle financeiro pessoal integrado ao WhatsApp utilizando a **API Oficial da Meta (Cloud API)** e banco de dados **Supabase (PostgreSQL)**.
 
 ---

@@ -255,20 +255,32 @@ async def receber_mensagens_green(request: Request):
         return Response(status_code=status.HTTP_200_OK)
 
     try:
-        if payload.get("typeWebhook") == "incomingMessageReceived":
+        type_webhook = payload.get("typeWebhook", "")
+        print(f"[GREEN API WEBHOOK RECEBIDO] Tipo: {type_webhook}")
+        
+        if type_webhook in ["incomingMessageReceived", "outgoingMessageReceived", "outgoingAPIMessageReceived"]:
             sender_data = payload.get("senderData", {})
             chat_id = str(sender_data.get("chatId", sender_data.get("sender", "")))
             chat_name = str(sender_data.get("chatName", "")).strip()
 
-            # TRAVA DE SEGURANÇA: Se for mensagem de grupo (@g.us), só processa se o nome for exatamente o GRUPO_PERMITIDO
+            # TRAVA DE SEGURANÇA: Se for mensagem de grupo (@g.us), só processa se o nome for compatível com GRUPO_PERMITIDO
             if "@g.us" in chat_id and GRUPO_PERMITIDO:
-                if chat_name.lower() != GRUPO_PERMITIDO.lower():
+                import unicodedata
+                def remover_acentos(txt: str) -> str:
+                    return ''.join(c for c in unicodedata.normalize('NFD', txt) if unicodedata.category(c) != 'Mn').lower()
+                
+                nome_recebido_limpo = remover_acentos(chat_name)
+                nome_permitido_limpo = remover_acentos(GRUPO_PERMITIDO)
+
+                if nome_permitido_limpo not in nome_recebido_limpo and nome_recebido_limpo not in nome_permitido_limpo:
                     print(f"[SEGURANÇA] Mensagem do grupo '{chat_name}' ignorada. Permitido apenas: '{GRUPO_PERMITIDO}'.")
                     return Response(status_code=status.HTTP_200_OK)
 
             texto = payload.get("messageData", {}).get("textMessageData", {}).get("textMessage", "").strip()
             if not texto:
                 texto = payload.get("messageData", {}).get("extendedTextMessageData", {}).get("text", "").strip()
+            
+            print(f"[GREEN API MENSAGEM] ChatID: {chat_id} | Grupo: {chat_name} | Texto: {texto}")
             if texto and chat_id:
                 await processar_mensagem_usuario(chat_id, texto)
     except Exception as e:

@@ -6,6 +6,7 @@
 # =========================================================================================
 
 import os
+import sys
 import re
 import httpx
 from datetime import datetime
@@ -14,6 +15,13 @@ from fastapi import FastAPI, Request, Response, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
 from supabase import create_client, Client
+
+# Garante suporte a UTF-8 no console do Windows para não falhar no cp1252
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 # -----------------------------------------------------------------------------------------
 # 1. CARREGAMENTO DE VARIÁVEIS DE AMBIENTE E CONFIGURAÇÕES DE SEGURANÇA
@@ -30,7 +38,7 @@ META_API_VERSION = os.getenv("META_API_VERSION", "v19.0").strip()
 
 # Validação inicial básica
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("⚠️ AVISO: As credenciais do Supabase não foram preenchidas no arquivo .env.")
+    print("[AVISO] As credenciais do Supabase não foram preenchidas no arquivo .env.")
 
 # -----------------------------------------------------------------------------------------
 # 2. INICIALIZAÇÃO DO BANCO DE DADOS (SUPABASE) E APP FASTAPI
@@ -42,9 +50,9 @@ supabase: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("✅ Conexão com o Supabase estabelecida com sucesso!")
+        print("[OK] Conexão com o Supabase estabelecida com sucesso!")
     except Exception as e:
-        print(f"❌ Erro ao inicializar cliente Supabase: {e}")
+        print(f"[ERRO] Erro ao inicializar cliente Supabase: {e}")
 
 # Criação da instância do aplicativo FastAPI
 app = FastAPI(
@@ -72,7 +80,7 @@ async def enviar_mensagem_whatsapp(numero_destino: str, texto_mensagem: str) -> 
     Utiliza httpx de forma assíncrona para máxima performance no FastAPI.
     """
     if not META_ACCESS_TOKEN or not META_PHONE_NUMBER_ID:
-        print("⚠️ Erro: Tokens da Meta API não configurados no .env.")
+        print("[AVISO] Tokens da Meta API não configurados no .env.")
         return False
 
     url = f"https://graph.facebook.com/{META_API_VERSION}/{META_PHONE_NUMBER_ID}/messages"
@@ -95,13 +103,13 @@ async def enviar_mensagem_whatsapp(numero_destino: str, texto_mensagem: str) -> 
         try:
             response = await client.post(url, headers=headers, json=payload, timeout=10.0)
             if response.status_code in [200, 201]:
-                print(f"✅ Mensagem enviada com sucesso para {numero_destino}.")
+                print(f"[OK] Mensagem enviada com sucesso para {numero_destino}.")
                 return True
             else:
-                print(f"❌ Erro ao enviar mensagem da Meta API ({response.status_code}): {response.text}")
+                print(f"[ERRO] Erro ao enviar mensagem da Meta API ({response.status_code}): {response.text}")
                 return False
         except Exception as e:
-            print(f"❌ Exceção ao tentar conectar com a Meta API: {e}")
+            print(f"[ERRO] Exceção ao tentar conectar com a Meta API: {e}")
             return False
 
 
@@ -167,11 +175,10 @@ async def verificar_webhook_meta(request: Request):
     hub_challenge = params.get("hub.challenge")
 
     if hub_mode == "subscribe" and hub_verify_token == META_VERIFY_TOKEN:
-        print("✅ Webhook verificado com sucesso pela Meta!")
-        # A Meta exige que o desafio seja retornado como plain text ou inteiro
+        print("[OK] Webhook verificado com sucesso pela Meta!")
         return PlainTextResponse(content=str(hub_challenge), status_code=200)
     
-    print("❌ Falha de verificação do Webhook: Token inválido.")
+    print("[ERRO] Falha de verificação do Webhook: Token inválido.")
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Token de verificação inválido ou modo incorreto."
@@ -190,27 +197,27 @@ async def receber_mensagens_whatsapp(request: Request):
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON inválido.")
 
-    # A Meta Cloud API envia uma estrutura aninhada; precisamos iterar com segurança
     try:
-        entry_list = payload.get("entry", [])
-        for entry in entry_list:
-            changes_list = entry.get("changes", [])
-            for change in changes_list:
-                value = change.get("value", {})
-                
-                # Verifica se há mensagens no evento
-                messages = value.get("messages", [])
-                for message in messages:
-                    # Garantir que é uma mensagem de texto e não áudio, imagem ou status
-                    if message.get("type") == "text":
-                        numero_remetente = message.get("from")
-                        corpo_texto = message.get("text", {}).get("body", "").strip()
-                        
-                        # Chama a lógica principal de processamento da mensagem em segundo plano
-                        await processar_mensagem_usuario(numero_remetente, corpo_texto)
-                        
+        if isinstance(payload, dict):
+            entry_list = payload.get("entry", [])
+            if isinstance(entry_list, list):
+                for entry in entry_list:
+                    if isinstance(entry, dict):
+                        changes_list = entry.get("changes", [])
+                        if isinstance(changes_list, list):
+                            for change in changes_list:
+                                if isinstance(change, dict):
+                                    value = change.get("value", {})
+                                    if isinstance(value, dict):
+                                        messages = value.get("messages", [])
+                                        if isinstance(messages, list):
+                                            for message in messages:
+                                                if isinstance(message, dict) and message.get("type") == "text":
+                                                    numero_remetente = str(message.get("from", ""))
+                                                    corpo_texto = str(message.get("text", {}).get("body", "")).strip()
+                                                    await processar_mensagem_usuario(numero_remetente, corpo_texto)
     except Exception as e:
-        print(f"❌ Erro ao processar payload do WhatsApp: {e}")
+        print(f"[ERRO] Erro ao processar payload do WhatsApp: {e}")
 
     # Sempre retorne 200 OK rapidamente para a Meta API não reenviar a notificação
     return Response(status_code=status.HTTP_200_OK)
@@ -288,6 +295,10 @@ async def inserir_transacao(numero: str, dados: Dict[str, Any]):
     Cumpre estritamente a regra de não interagir com outras tabelas.
     Envia confirmação via Meta API após a inserção.
     """
+    if supabase is None:
+        await enviar_mensagem_whatsapp(numero, "❌ Erro: Conexão com o banco de dados Supabase não configurada.")
+        return
+
     try:
         # Monta o payload para inserção no Supabase
         novo_registro = {
@@ -317,7 +328,7 @@ async def inserir_transacao(numero: str, dados: Dict[str, Any]):
             await enviar_mensagem_whatsapp(numero, "❌ Erro ao salvar transação no banco de dados.")
             
     except Exception as e:
-        print(f"❌ Erro no Supabase durante INSERT em financas_transacoes: {e}")
+        print(f"[ERRO] Erro no Supabase durante INSERT em financas_transacoes: {e}")
         await enviar_mensagem_whatsapp(numero, "❌ Erro interno ao tentar registrar sua transação no banco.")
 
 
@@ -327,6 +338,10 @@ async def gerar_e_enviar_relatorio_mensal(numero: str):
     NÃO deleta, altera ou apaga nenhum dado do banco.
     Soma entradas, subtrai saídas e envia mensagem formatada com o saldo atual via WhatsApp.
     """
+    if supabase is None:
+        await enviar_mensagem_whatsapp(numero, "❌ Erro: Conexão com o banco de dados Supabase não configurada.")
+        return
+
     try:
         agora = datetime.now()
         ano_atual = agora.year
@@ -348,7 +363,8 @@ async def gerar_e_enviar_relatorio_mensal(numero: str):
             .execute()
         )
         
-        transacoes = consulta.data or []
+        raw_data = consulta.data or []
+        transacoes: list[dict[str, Any]] = [dict(item) for item in raw_data if isinstance(item, dict)]
         
         total_entradas = 0.0
         total_gastos = 0.0
@@ -383,7 +399,7 @@ async def gerar_e_enviar_relatorio_mensal(numero: str):
         await enviar_mensagem_whatsapp(numero, msg_relatorio)
         
     except Exception as e:
-        print(f"❌ Erro ao gerar relatório mensal no Supabase: {e}")
+        print(f"[ERRO] Erro ao gerar relatório mensal no Supabase: {e}")
         await enviar_mensagem_whatsapp(numero, "❌ Erro ao calcular o relatório mensal.")
 
 

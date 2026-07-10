@@ -33,8 +33,10 @@ O **Porquinho WhatsApp** é um assistente financeiro pessoal de ponta integrado 
 ### ✅ Backend Principal (`main.py`)
 - **Conexão Segura e Tipada com Supabase:** Configurada com `Optional[Client]` e validação explícita (`if supabase is None:` e guardas de tipo para evitar erros `NoneType` no Pyrefly/Pyright).
 - **Verificação de Webhook (`GET /webhook`):** Validação oficial do `hub.verify_token` (`schaide123`) respondendo com o `hub.challenge` para a Meta Cloud API.
-- **Recebimento de Mensagens (`POST /webhook`):**
+- **Recebimento de Mensagens Meta API (`POST /webhook`):**
   - Leitura segura e tipada de estruturas JSON aninhadas da Meta.
+- **Recebimento de Mensagens Evolution API (`POST /webhook-evolution`):**
+  - Leitura assíncrona de eventos `messages.upsert` do WhatsApp Não-Oficial (QR Code).
   - Normalização de texto (`lower()`, `strip()`) tornando os comandos **case-insensitive**.
   - Suporte a sinônimos de entrada e saída (`gasto`, `gastei`, `saida`, `saída`, `paguei`, `entrada`, `entrei`, `recebi`, `ganhei`, `deposito`, `depósito`).
 - **Registro de Transações (`inserir_transacao`):**

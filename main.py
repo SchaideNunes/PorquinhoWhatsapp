@@ -36,6 +36,11 @@ META_ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN", "").strip()
 META_PHONE_NUMBER_ID = os.getenv("META_PHONE_NUMBER_ID", "").strip()
 META_API_VERSION = os.getenv("META_API_VERSION", "v19.0").strip()
 
+# Configurações para Evolution API (WhatsApp Não-Oficial via QR Code)
+EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "").strip().rstrip("/")
+EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY", "").strip()
+EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "").strip()
+
 # Validação inicial básica
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("[AVISO] As credenciais do Supabase não foram preenchidas no arquivo .env.")
@@ -76,20 +81,44 @@ def formatar_moeda(valor: float) -> str:
 
 async def enviar_mensagem_whatsapp(numero_destino: str, texto_mensagem: str) -> bool:
     """
-    Envia uma mensagem de texto via POST para a API Oficial da Meta (Cloud API).
-    Utiliza httpx de forma assíncrona para máxima performance no FastAPI.
+    Envia uma mensagem de texto.
+    Prioriza a Evolution API (WhatsApp Não-Oficial via QR Code) se configurada.
+    Caso contrário, utiliza a API Oficial da Meta (Cloud API).
     """
+    # 1. Envio via Evolution API
+    if EVOLUTION_API_URL and EVOLUTION_API_KEY and EVOLUTION_INSTANCE:
+        url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE}"
+        headers = {
+            "apikey": EVOLUTION_API_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "number": numero_destino,
+            "text": texto_mensagem
+        }
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(url, headers=headers, json=payload, timeout=10.0)
+                if response.status_code in [200, 201]:
+                    print(f"[OK] Mensagem enviada via Evolution API para {numero_destino}.")
+                    return True
+                else:
+                    print(f"[ERRO] Erro ao enviar via Evolution API ({response.status_code}): {response.text}")
+                    return False
+            except Exception as e:
+                print(f"[ERRO] Exceção ao conectar com Evolution API: {e}")
+                return False
+
+    # 2. Envio via Meta Cloud API (Fallback)
     if not META_ACCESS_TOKEN or not META_PHONE_NUMBER_ID:
         print("[AVISO] Tokens da Meta API não configurados no .env.")
         return False
 
     url = f"https://graph.facebook.com/{META_API_VERSION}/{META_PHONE_NUMBER_ID}/messages"
-    
     headers = {
         "Authorization": f"Bearer {META_ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
-    
     payload = {
         "messaging_product": "whatsapp",
         "to": numero_destino,
@@ -103,7 +132,7 @@ async def enviar_mensagem_whatsapp(numero_destino: str, texto_mensagem: str) -> 
         try:
             response = await client.post(url, headers=headers, json=payload, timeout=10.0)
             if response.status_code in [200, 201]:
-                print(f"[OK] Mensagem enviada com sucesso para {numero_destino}.")
+                print(f"[OK] Mensagem enviada com sucesso via Meta API para {numero_destino}.")
                 return True
             else:
                 print(f"[ERRO] Erro ao enviar mensagem da Meta API ({response.status_code}): {response.text}")
@@ -191,6 +220,46 @@ async def verificar_webhook_meta(request: Request):
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Token de verificação inválido ou modo incorreto."
     )
+
+
+@app.post("/webhook-evolution")
+async def receber_mensagens_evolution(request: Request):
+    """
+    ROTA POST /webhook-evolution:
+    Recebe o payload assíncrono de eventos e mensagens da Evolution API (WhatsApp via QR Code).
+    Processa mensagens de texto e responde no mesmo chat/grupo.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return Response(status_code=status.HTTP_200_OK)
+
+    try:
+        event = payload.get("event", "")
+        if event in ["messages.upsert", "MESSAGES_UPSERT"]:
+            data = payload.get("data", {})
+            key = data.get("key", {})
+            remote_jid = str(key.get("remoteJid", ""))
+            
+            # Ignora status/stories (@broadcast)
+            if "broadcast" not in remote_jid:
+                numero_remetente = remote_jid.split("@")[0]
+                
+                msg_obj = data.get("message", {})
+                corpo_texto = ""
+                if isinstance(msg_obj, dict):
+                    if "conversation" in msg_obj:
+                        corpo_texto = str(msg_obj.get("conversation", ""))
+                    elif "extendedTextMessage" in msg_obj:
+                        corpo_texto = str(msg_obj.get("extendedTextMessage", {}).get("text", ""))
+                
+                corpo_texto = corpo_texto.strip()
+                if corpo_texto:
+                    await processar_mensagem_usuario(numero_remetente, corpo_texto)
+    except Exception as e:
+        print(f"[ERRO] Erro ao processar payload da Evolution API: {e}")
+
+    return Response(status_code=status.HTTP_200_OK)
 
 
 @app.post("/webhook")

@@ -255,13 +255,14 @@ async def receber_mensagens_green(request: Request):
 
     try:
         if payload.get("typeWebhook") == "incomingMessageReceived":
-            sender = payload.get("senderData", {}).get("sender", "")
-            numero_remetente = sender.split("@")[0]
+            sender_data = payload.get("senderData", {})
+            # Se for grupo, chatId termina em @g.us; se for individual, @c.us
+            chat_id = sender_data.get("chatId", sender_data.get("sender", ""))
             texto = payload.get("messageData", {}).get("textMessageData", {}).get("textMessage", "").strip()
             if not texto:
                 texto = payload.get("messageData", {}).get("extendedTextMessageData", {}).get("text", "").strip()
-            if texto and numero_remetente:
-                await processar_mensagem_usuario(numero_remetente, texto)
+            if texto and chat_id:
+                await processar_mensagem_usuario(chat_id, texto)
     except Exception as e:
         print(f"[ERRO] Erro no webhook Green API: {e}")
 

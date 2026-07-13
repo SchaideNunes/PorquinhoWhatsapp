@@ -27,3 +27,6 @@ __pycache__/
 *.log
 .DS_Store
 Thumbs.db
+
+# Servidor Local Evolution API
+evolution-api/

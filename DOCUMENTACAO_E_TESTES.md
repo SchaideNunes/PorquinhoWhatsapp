@@ -39,6 +39,13 @@ O **Porquinho WhatsApp** é um assistente financeiro pessoal de ponta integrado 
   - Leitura assíncrona de eventos `messages.upsert` do WhatsApp Não-Oficial (QR Code).
   - Normalização de texto (`lower()`, `strip()`) tornando os comandos **case-insensitive**.
   - Suporte a sinônimos de entrada e saída (`gasto`, `gastei`, `saida`, `saída`, `paguei`, `entrada`, `entrei`, `recebi`, `ganhei`, `deposito`, `depósito`).
+  - **Servidor Local Evolution API v2.3.7 (Sem Docker / Windows Node.js Nativo):**
+    - A Evolution API foi clonada na pasta `evolution-api/` e configurada para rodar localmente no Windows de forma otimizada com `CACHE_LOCAL_ENABLED=true` e `DATABASE_ENABLED=false` (sem necessidade de Redis, Docker ou Hyper-V na BIOS).
+    - **Como rodar pelo script automático (1 clique):** Dê 2 cliques em `rodar_evolution_api.bat` na raiz do projeto.
+    - **Como rodar manualmente pelo Terminal (Sem o arquivo executável):**
+      1. Abra o Terminal / PowerShell na pasta raiz e digite: `cd evolution-api`
+      2. Inicie o servidor Node.js com o comando: `node dist/main.js` (ou `npm run start:prod`).
+      3. O painel visual estará disponível em: `http://localhost:8080/manager` (API Key: `schaide123`).
 - **Registro de Transações (`inserir_transacao`):**
   - Parse inteligente de valores monetários com vírgula ou ponto (ex: `45,50` ou `45.50`).
   - Inserção na tabela `financas_transacoes`.

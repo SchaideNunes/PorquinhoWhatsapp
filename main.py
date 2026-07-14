@@ -320,6 +320,7 @@ async def receber_mensagens_evolution(request: Request):
             data = payload.get("data", {})
             key = data.get("key", {})
             remote_jid = str(key.get("remoteJid", ""))
+            push_name = str(data.get("pushName", "")).strip()
             
             # Ignora status/stories (@broadcast)
             if "broadcast" not in remote_jid:
@@ -335,7 +336,7 @@ async def receber_mensagens_evolution(request: Request):
                 
                 corpo_texto = corpo_texto.strip()
                 if corpo_texto:
-                    await processar_mensagem_usuario(numero_remetente, corpo_texto)
+                    await processar_mensagem_usuario(numero_remetente, corpo_texto, push_name)
     except Exception as e:
         print(f"[ERRO] Erro ao processar payload da Evolution API: {e}")
 
@@ -391,9 +392,10 @@ async def receber_mensagens_whatsapp(request: Request):
 # 5. LÓGICA DE NEGÓCIO (INSERÇÃO E RELATÓRIO SOB DEMANDA)
 # -----------------------------------------------------------------------------------------
 
-async def processar_mensagem_usuario(numero: str, texto: str):
+async def processar_mensagem_usuario(numero: str, texto: str, push_name: str = ""):
     """
     Roteador lógico das mensagens recebidas:
+    0. Permite trocar o nome de tratamento ("meu nome é ...").
     1. Verifica se é pedido de relatório ("gere o relatorio do mes").
     2. Verifica se é comando de transação ("gasto ..." ou "entrada ...").
     3. Responde com mensagem de ajuda caso não entenda.
@@ -405,8 +407,32 @@ async def processar_mensagem_usuario(numero: str, texto: str):
         )
         return
 
+    # Garante/recupera o perfil no banco de dados, capturando o pushName do WhatsApp se o nome for padrão
+    await obter_ou_criar_usuario(numero, push_name)
+
     texto_normalizado = re.sub(r'\s+', ' ', texto.lower().strip())
     
+    # -------------------------------------------------------------------------------------
+    # CASO 0: COMANDO PARA TROCAR / ATUALIZAR NOME DO USUÁRIO
+    # -------------------------------------------------------------------------------------
+    match_nome = re.match(r"^(?:meu\s+nome\s+é|trocar\s+nome\s+para|mudar\s+nome\s+para|alterar\s+nome\s+para|me\s+chame\s+de|nome)\s+(.+)$", texto_normalizado)
+    if match_nome:
+        novo_nome = match_nome.group(1).strip().title()
+        if len(novo_nome) >= 2 and novo_nome.lower() not in ["ajuda", "menu", "relatorio", "gasto", "entrada"]:
+            try:
+                variacoes = gerar_variacoes_telefone(numero)
+                supabase.table("financas_usuarios").update({"nome": novo_nome}).in_("telefone", variacoes).execute()
+                await enviar_mensagem_whatsapp(
+                    numero,
+                    f"✅ *Nome atualizado com sucesso!*\n\nA partir de agora chamarei você de *{novo_nome}*. 🐷"
+                )
+            except Exception as e_nome:
+                await enviar_mensagem_whatsapp(
+                    numero,
+                    f"❌ Erro ao atualizar o nome no banco de dados: {e_nome}"
+                )
+            return
+
     # -------------------------------------------------------------------------------------
     # CASO 1: RELATÓRIO SOB DEMANDA
     # -------------------------------------------------------------------------------------
@@ -473,6 +499,9 @@ async def enviar_mensagem_ajuda(numero: str):
         "• *Relatório e Saldo do Mês:*\n"
         "Consulta o resumo financeiro atual.\n"
         "👉 _Exemplo:_ `relatorio` ou `gere o relatorio do mes`\n\n"
+        "• *Trocar seu Nome:*\n"
+        "Atualiza o nome pelo qual eu chamo você.\n"
+        "👉 _Exemplo:_ `meu nome é Carlos` ou `trocar nome para Ana`\n\n"
         "• *Ajuda e Menu:*\n"
         "Exibe esta lista a qualquer momento.\n"
         "👉 _Exemplo:_ `ajuda` ou `menu`\n\n"
@@ -515,25 +544,34 @@ def gerar_variacoes_telefone(numero: str) -> list[str]:
     return list(variacoes)
 
 
-async def obter_ou_criar_usuario(numero: str) -> Dict[str, Any]:
+async def obter_ou_criar_usuario(numero: str, push_name: str = "") -> Dict[str, Any]:
     """
     Busca o perfil do usuário na tabela 'financas_usuarios' pelo número de WhatsApp.
-    Se não existir, cria automaticamente com dia_inicio_mes = 1, dia_fechamento_cartao = 1 e receber_alerta_automatico = True.
+    Se não existir, cria automaticamente. Se existir e o nome for 'Usuário' (padrão) e recebermos um pushName real, atualiza o nome no banco.
     """
     if supabase is None:
-        return {"telefone": numero, "nome": "Usuário", "plano": "gratuito", "dia_inicio_mes": 1, "dia_fechamento_cartao": 1, "receber_alerta_automatico": True}
+        return {"telefone": numero, "nome": push_name.title() if push_name and push_name.strip() else "Usuário", "plano": "gratuito", "dia_inicio_mes": 1, "dia_fechamento_cartao": 1, "receber_alerta_automatico": True}
 
     try:
         variacoes = gerar_variacoes_telefone(numero)
         consulta = supabase.table("financas_usuarios").select("*").in_("telefone", variacoes).execute()
         raw_data = consulta.data or []
         if raw_data and isinstance(raw_data[0], dict):
-            return dict(raw_data[0])
+            user_dict = dict(raw_data[0])
+            # Se o nome no banco ainda é "Usuário" e o WhatsApp enviou um pushName real, atualiza no banco
+            if push_name and push_name.strip() and push_name.title() not in ["Usuário", "Usuario"] and user_dict.get("nome", "") in ["Usuário", "Usuario", ""]:
+                try:
+                    supabase.table("financas_usuarios").update({"nome": push_name.title()}).in_("telefone", variacoes).execute()
+                    user_dict["nome"] = push_name.title()
+                except Exception as e_up:
+                    print(f"[AVISO] Não foi possível atualizar o push_name do usuário: {e_up}")
+            return user_dict
         
         # Cria novo perfil se ainda não existir
+        nome_inicial = push_name.title() if push_name and push_name.strip() and push_name.title() not in ["Usuário", "Usuario"] else "Usuário"
         novo_usuario = {
             "telefone": numero,
-            "nome": "Usuário",
+            "nome": nome_inicial,
             "plano": "gratuito",
             "dia_inicio_mes": 1,
             "dia_fechamento_cartao": 1,
@@ -543,7 +581,7 @@ async def obter_ou_criar_usuario(numero: str) -> Dict[str, Any]:
         return novo_usuario
     except Exception as e:
         print(f"[ERRO] Erro ao obter/criar usuário no Supabase: {e}")
-        return {"telefone": numero, "nome": "Usuário", "plano": "gratuito", "dia_inicio_mes": 1, "dia_fechamento_cartao": 1, "receber_alerta_automatico": True}
+        return {"telefone": numero, "nome": push_name.title() if push_name and push_name.strip() else "Usuário", "plano": "gratuito", "dia_inicio_mes": 1, "dia_fechamento_cartao": 1, "receber_alerta_automatico": True}
 
 
 async def inserir_transacao(numero: str, dados: Dict[str, Any]):
@@ -844,6 +882,29 @@ async def obter_dados_dashboard(telefone: Optional[str] = None):
     except Exception as e:
         print(f"[ERRO] Erro na rota /api/dashboard: {e}")
         raise HTTPException(status_code=500, detail="Erro interno ao consultar dados do dashboard.")
+
+
+@app.put("/api/usuario/nome")
+async def atualizar_nome_usuario(payload: Dict[str, Any]):
+    """
+    Endpoint para atualizar o nome do usuário na tabela 'financas_usuarios' pelo telefone via API (Dashboard).
+    """
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Serviço indisponível. Supabase não conectado.")
+
+    telefone = payload.get("telefone", "")
+    novo_nome = payload.get("nome", "").strip().title()
+
+    if not telefone or not novo_nome or len(novo_nome) < 2:
+        raise HTTPException(status_code=400, detail="Parâmetros inválidos: telefone e nome (mínimo 2 caracteres) são obrigatórios.")
+
+    try:
+        variacoes = gerar_variacoes_telefone(str(telefone))
+        resposta = supabase.table("financas_usuarios").update({"nome": novo_nome}).in_("telefone", variacoes).execute()
+        return {"status": "success", "message": f"Nome atualizado com sucesso para: {novo_nome}", "data": resposta.data}
+    except Exception as e:
+        print(f"[ERRO] Erro ao atualizar nome via API: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno ao atualizar o nome do usuário.")
 
 
 # -----------------------------------------------------------------------------------------

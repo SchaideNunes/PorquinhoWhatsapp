@@ -24,7 +24,6 @@ export default function Header({ telefoneAtual, onSearch, usuario }) {
           </div>
           <div>
             <h1 className="brand-title">Porquinho WhatsApp</h1>
-            <p className="brand-subtitle">Dashboard Financeiro e Gestão em Nuvem</p>
           </div>
         </div>
 
@@ -49,7 +48,7 @@ export default function Header({ telefoneAtual, onSearch, usuario }) {
       {usuario && (
         <div className="user-info-bar animate-fade-in">
           <div className="user-welcome">
-            <User size={18} color="#38bdf8" />
+            <User size={18} color="#94a3b8" />
             <span>Olá, <strong>{usuario.nome}</strong></span>
             <span className="user-badge">{usuario.plano}</span>
           </div>

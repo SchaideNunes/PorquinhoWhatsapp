@@ -481,6 +481,40 @@ async def enviar_mensagem_ajuda(numero: str):
     await enviar_mensagem_whatsapp(numero, msg_ajuda)
 
 
+def gerar_variacoes_telefone(numero: str) -> list[str]:
+    """
+    Gera as variações do número de telefone para resolver o problema do 9º dígito no Brasil
+    e números digitados com ou sem o DDI (55), garantindo que o usuário seja encontrado em qualquer formato.
+    """
+    limpo = re.sub(r"\D", "", numero.strip())
+    if not limpo:
+        return [numero]
+
+    variacoes = set([limpo])
+
+    # 1. Garante versão com DDI 55
+    if (len(limpo) == 10 or len(limpo) == 11) and not limpo.startswith("55"):
+        num_ddi = "55" + limpo
+        variacoes.add(num_ddi)
+    else:
+        num_ddi = limpo
+
+    # 2. Variações do 9º dígito para números com DDI 55
+    if num_ddi.startswith("55"):
+        # Se tem 13 dígitos (ex: 55 75 9 91503949), gera também a versão de 12 dígitos sem o 9º
+        if len(num_ddi) == 13 and num_ddi[4] == "9":
+            sem_nono = num_ddi[:4] + num_ddi[5:]
+            variacoes.add(sem_nono)
+            variacoes.add(sem_nono[2:])  # sem DDI
+        # Se tem 12 dígitos (ex: 55 75 91503949), gera também a versão de 13 dígitos com o 9º
+        elif len(num_ddi) == 12:
+            com_nono = num_ddi[:4] + "9" + num_ddi[4:]
+            variacoes.add(com_nono)
+            variacoes.add(com_nono[2:])  # sem DDI
+
+    return list(variacoes)
+
+
 async def obter_ou_criar_usuario(numero: str) -> Dict[str, Any]:
     """
     Busca o perfil do usuário na tabela 'financas_usuarios' pelo número de WhatsApp.
@@ -490,7 +524,8 @@ async def obter_ou_criar_usuario(numero: str) -> Dict[str, Any]:
         return {"telefone": numero, "nome": "Usuário", "plano": "gratuito", "dia_inicio_mes": 1, "dia_fechamento_cartao": 1, "receber_alerta_automatico": True}
 
     try:
-        consulta = supabase.table("financas_usuarios").select("*").eq("telefone", numero).execute()
+        variacoes = gerar_variacoes_telefone(numero)
+        consulta = supabase.table("financas_usuarios").select("*").in_("telefone", variacoes).execute()
         raw_data = consulta.data or []
         if raw_data and isinstance(raw_data[0], dict):
             return dict(raw_data[0])
@@ -521,12 +556,13 @@ async def inserir_transacao(numero: str, dados: Dict[str, Any]):
         return
 
     try:
-        # Garante ou recupera perfil do usuário no banco
-        await obter_ou_criar_usuario(numero)
+        # Garante ou recupera perfil do usuário no banco (com suporte a variações do 9º dígito)
+        usuario = await obter_ou_criar_usuario(numero)
+        telefone_real = str(usuario.get("telefone", numero))
 
         # Monta o payload para inserção no Supabase com suporte multi-usuário (isolado por telefone)
         novo_registro = {
-            "telefone": numero,
+            "telefone": telefone_real,
             "tipo": dados["tipo"],
             "valor": dados["valor"],
             "categoria": dados["categoria"],
@@ -607,11 +643,13 @@ async def gerar_e_enviar_relatorio_mensal(numero: str):
         inicio_mes = inicio_mes_dt.isoformat()
         inicio_proximo_mes = inicio_proximo_mes_dt.isoformat()
 
+        variacoes = gerar_variacoes_telefone(numero)
+
         # Consulta APENAS leitura (SELECT) na tabela financas_transacoes filtrada por usuário e período
         consulta = (
             supabase.table("financas_transacoes")
             .select("tipo, valor, created_at")
-            .eq("telefone", numero)
+            .in_("telefone", variacoes)
             .gte("created_at", inicio_mes)
             .lt("created_at", inicio_proximo_mes)
             .execute()
@@ -678,11 +716,12 @@ async def obter_dados_dashboard(telefone: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Banco de dados Supabase não conectado.")
 
     try:
+        variacoes = gerar_variacoes_telefone(numero)
         # Consulta o usuário para obter configurações de período financeiro e dados de perfil
         consulta_user = (
             supabase.table("financas_usuarios")
-            .select("nome, plano, dia_inicio_mes")
-            .eq("telefone", numero)
+            .select("telefone, nome, plano, dia_inicio_mes")
+            .in_("telefone", variacoes)
             .execute()
         )
         user_raw = consulta_user.data or []
@@ -731,11 +770,11 @@ async def obter_dados_dashboard(telefone: Optional[str] = None):
         inicio_mes = inicio_mes_dt.isoformat()
         inicio_proximo_mes = inicio_proximo_mes_dt.isoformat()
 
-        # Consulta APENAS leitura (SELECT) na tabela financas_transacoes
+        # Consulta APENAS leitura (SELECT) na tabela financas_transacoes considerando todas as variações do número
         consulta_transacoes = (
             supabase.table("financas_transacoes")
             .select("id, created_at, tipo, valor, categoria, descricao")
-            .eq("telefone", numero)
+            .in_("telefone", variacoes)
             .gte("created_at", inicio_mes)
             .lt("created_at", inicio_proximo_mes)
             .order("created_at", desc=True)

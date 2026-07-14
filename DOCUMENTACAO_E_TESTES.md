@@ -39,13 +39,14 @@ O **Porquinho WhatsApp** é um assistente financeiro pessoal de ponta integrado 
   - Leitura assíncrona de eventos `messages.upsert` do WhatsApp Não-Oficial (QR Code).
   - Normalização de texto (`lower()`, `strip()`) tornando os comandos **case-insensitive**.
   - Suporte a sinônimos de entrada e saída (`gasto`, `gastei`, `saida`, `saída`, `paguei`, `entrada`, `entrei`, `recebi`, `ganhei`, `deposito`, `depósito`).
-  - **Servidor Local Evolution API v2.3.7 (Sem Docker / Windows Node.js Nativo):**
-    - A Evolution API foi clonada na pasta `evolution-api/` e configurada para rodar localmente no Windows de forma otimizada com `CACHE_LOCAL_ENABLED=true` e `DATABASE_ENABLED=false` (sem necessidade de Redis, Docker ou Hyper-V na BIOS).
-    - **Como rodar pelo script automático (1 clique):** Dê 2 cliques em `rodar_evolution_api.bat` na raiz do projeto.
-    - **Como rodar manualmente pelo Terminal (Sem o arquivo executável):**
-      1. Abra o Terminal / PowerShell na pasta raiz e digite: `cd evolution-api`
-      2. Inicie o servidor Node.js com o comando: `node dist/main.js` (ou `npm run start:prod`).
-      3. O painel visual estará disponível em: `http://localhost:8080/manager` (API Key: `schaide123`).
+  - **Servidor Local Evolution API v2.3.7 + Cérebro Python no Supabase Dedicado (PorquinhoWhatsapp):**
+    - A Evolution API e o Cérebro Python rodam localmente no computador do usuário, 100% integrados e salvando sessões, instâncias e transações no banco dedicado **`PorquinhoWhatsapp`** na nuvem do Supabase.
+    - **Como rodar o Servidor do WhatsApp (Evolution API):** Dê 2 cliques em `rodar_evolution_api.bat` (porta 8080).
+    - **Como rodar o Cérebro Python do Porquinho:** Dê 2 cliques em `rodar_porquinho.bat` (porta 8000).
+    - **Sem arquivos executáveis `.bat` (via terminal manual):**
+      1. Evolution API: `cd evolution-api` e `node dist/main.js`
+      2. Cérebro Python: `py -m uvicorn main:app --host 0.0.0.0 --port 8000`
+    - Painel e Webhook local configurado: `http://localhost:8080/manager` (Webhook para `http://localhost:8000/webhook-evolution`).
 - **Registro de Transações (`inserir_transacao`):**
   - Parse inteligente de valores monetários com vírgula ou ponto (ex: `45,50` ou `45.50`).
   - Inserção na tabela `financas_transacoes`.
@@ -103,13 +104,12 @@ Garantir que os seguintes formatos sejam reconhecidos corretamente:
 
 ## 5. ROADMAP / PRÓXIMAS ATIVIDADES PROGRAMADAS
 
-### 🚀 Atividade 1: Comando interativo de AJUDA / HELP pelo WhatsApp
-- **Objetivo:** Criar um comando interativo (`ajuda`, `help`, `comandos`, `menu` ou `?`) que o usuário possa enviar no WhatsApp para receber um guia rápido e bonito com todos os comandos disponíveis do Porquinho.
-- **O que deverá incluir no Menu de Ajuda:**
-  1. Como registrar gastos (exemplos práticos com `gasto` e `gastei`).
-  2. Como registrar entradas/ganhos (exemplos práticos com `entrada` e `recebi`).
-  3. Como consultar o saldo e o relatório do mês (`gere o relatorio do mes`).
-  4. Dicas de categorias automáticas.
+### 🚀 [EM FOCO PARA AMANHÃ] Atividade 1: Comando interativo de AJUDA / HELP pelo WhatsApp
+- **Objetivo:** Criar uma resposta organizada e elegante quando o usuário enviar comandos como `Help`, `Ajuda`, `Comandos` ou `?` no WhatsApp.
+- **O que deverá retornar:**
+  1. Uma lista bonita com as funções e comandos do Porquinho (o usuário irá estruturar as funções desejadas para o menu).
+  2. Exemplos práticos de como registrar entradas e gastos.
+  3. Guia de relatórios e consultas.
 
 ### ☁️ [CONCLUÍDO - RENDER.COM] Atividade 2: Publicação e Hospedagem 24/7 na Nuvem
 - **Status:** Concluído com sucesso no Render.com (URL oficial conectada com Webhook da Meta e Token Permanente).

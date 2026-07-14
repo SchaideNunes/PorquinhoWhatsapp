@@ -1,18 +1,13 @@
-# =========================================================================================
-# BOT FINANCEIRO WHATSAPP "PORQUINHO" - BACKEND FASTAPI
-# =========================================================================================
-# Desenvolvido por: Desenvolvedor Python Sênior Especialista em Automação e Webhooks
-# Stack: Python, FastAPI, Supabase (PostgreSQL), Meta Cloud API (WhatsApp)
-# =========================================================================================
-
 import os
 import sys
 import re
+import json
 import httpx
 from datetime import datetime
 from typing import Optional, Dict, Any
 from fastapi import FastAPI, Request, Response, HTTPException, status
 from fastapi.responses import PlainTextResponse
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -69,6 +64,15 @@ app = FastAPI(
     title="Porquinho WhatsApp Bot - API",
     description="Backend para automação financeira pessoal via WhatsApp e Supabase.",
     version="1.0.0"
+)
+
+# Configuração de CORS para permitir que o Dashboard Web (React na Vercel ou local) acesse a API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # -----------------------------------------------------------------------------------------
@@ -202,9 +206,9 @@ def extrair_dados_transacao(texto_mensagem: str):
         
     # Identificação da descrição e inferência simples de categoria
     if len(partes) == 3:
-        descricao = partes[2].strip()
-        # A categoria será a primeira palavra da descrição capitalizada (ex: "Almoço", "Pix")
-        categoria = descricao.split()[0].capitalize()
+        descricao = partes[2].strip().rstrip(".!?;")
+        # A categoria será a primeira palavra da descrição capitalizada sem pontuação final
+        categoria = descricao.split()[0].capitalize().rstrip(".!?;")
     else:
         descricao = "Não informado"
         categoria = "Geral"
@@ -341,39 +345,46 @@ async def receber_mensagens_evolution(request: Request):
 @app.post("/webhook")
 async def receber_mensagens_whatsapp(request: Request):
     """
-    ROTA POST /webhook:
-    Recebe o payload assíncrono de eventos e mensagens do WhatsApp (Meta Cloud API).
-    Processa mensagens de texto, aplica a lógica de finanças e responde ao usuário.
+    Endpoint POST para receber notificações e mensagens da Meta Cloud API (Webhook).
+    Processa estruturas aninhadas com tipagem segura e envia para o processador principal.
     """
     try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON inválido.")
+        dados = await request.json()
+        print(f"[META API] Webhook recebido: {json.dumps(dados, indent=2)}")
 
-    try:
-        if isinstance(payload, dict):
-            entry_list = payload.get("entry", [])
-            if isinstance(entry_list, list):
-                for entry in entry_list:
-                    if isinstance(entry, dict):
-                        changes_list = entry.get("changes", [])
-                        if isinstance(changes_list, list):
-                            for change in changes_list:
-                                if isinstance(change, dict):
-                                    value = change.get("value", {})
-                                    if isinstance(value, dict):
-                                        messages = value.get("messages", [])
-                                        if isinstance(messages, list):
-                                            for message in messages:
-                                                if isinstance(message, dict) and message.get("type") == "text":
-                                                    numero_remetente = str(message.get("from", ""))
-                                                    corpo_texto = str(message.get("text", {}).get("body", "")).strip()
-                                                    await processar_mensagem_usuario(numero_remetente, corpo_texto)
+        entry_list = dados.get("entry", [])
+        if isinstance(entry_list, list):
+            for entry in entry_list:
+                if not isinstance(entry, dict):
+                    continue
+                changes_list = entry.get("changes", [])
+                if isinstance(changes_list, list):
+                    for change in changes_list:
+                        if not isinstance(change, dict):
+                            continue
+                        value = change.get("value", {})
+                        if not isinstance(value, dict):
+                            continue
+                        messages_list = value.get("messages", [])
+                        if isinstance(messages_list, list):
+                            for msg in messages_list:
+                                if not isinstance(msg, dict):
+                                    continue
+                                if msg.get("type") == "text":
+                                    text_obj = msg.get("text", {})
+                                    if isinstance(text_obj, dict):
+                                        texto_mensagem = text_obj.get("body", "")
+                                        numero_remetente = msg.get("from", "")
+
+                                        if texto_mensagem and numero_remetente:
+                                            print(f"[META API] Mensagem de {numero_remetente}: {texto_mensagem}")
+                                            await processar_mensagem_usuario(numero_remetente, texto_mensagem)
+
+        return {"status": "success", "message": "Webhook processado com sucesso"}
+
     except Exception as e:
-        print(f"[ERRO] Erro ao processar payload do WhatsApp: {e}")
-
-    # Sempre retorne 200 OK rapidamente para a Meta API não reenviar a notificação
-    return Response(status_code=status.HTTP_200_OK)
+        print(f"[ERRO] Falha ao processar Webhook da Meta: {e}")
+        return {"status": "error", "message": str(e)}
 
 
 # -----------------------------------------------------------------------------------------
@@ -404,6 +415,13 @@ async def processar_mensagem_usuario(numero: str, texto: str):
         return
 
     # -------------------------------------------------------------------------------------
+    # CASO 1.5: COMANDOS EXPLICITOS DE AJUDA / SAUDAÇÃO
+    # -------------------------------------------------------------------------------------
+    if texto_normalizado in ["ajuda", "help", "menu", "comandos", "?", "oi", "ola", "olá", "bom dia", "boa tarde", "boa noite"]:
+        await enviar_mensagem_ajuda(numero)
+        return
+
+    # -------------------------------------------------------------------------------------
     # CASO 2: INSERÇÃO DE GASTO OU ENTRADA
     # -------------------------------------------------------------------------------------
     primeira_palavra = texto_normalizado.split()[0] if texto_normalizado.split() else ""
@@ -417,13 +435,10 @@ async def processar_mensagem_usuario(numero: str, texto: str):
         if not dados_transacao:
             mensagem_erro = (
                 "❌ *Formato inválido!*\n\n"
-                "Para registrar, utilize o padrão:\n"
-                "👉 `gasto <valor> <descrição>`\n"
-                "👉 `entrada <valor> <descrição>`\n\n"
-                "*Exemplos:*\n"
-                "• `gasto 50 almoço`\n"
-                "• `gasto 120,50 mercado`\n"
-                "• `entrada 100 pix`"
+                "Para registrar sem perder o nexo, diga se é entrada ou saída, o valor e a descrição após:\n\n"
+                "*Exemplos simples:*\n"
+                "🟢 `Entrada 1500 Salario.`\n"
+                "🔴 `Gastei 250 academia.`"
             )
             await enviar_mensagem_whatsapp(numero, mensagem_erro)
             return
@@ -432,34 +447,86 @@ async def processar_mensagem_usuario(numero: str, texto: str):
         return
 
     # -------------------------------------------------------------------------------------
-    # CASO 3: COMANDO NÃO RECONHECIDO (AJUDA)
+    # CASO 3: COMANDO NÃO RECONHECIDO (FALLBACK PARA AJUDA)
     # -------------------------------------------------------------------------------------
-    mensagem_ajuda = (
-        "🐷 *Olá! Sou o Porquinho, seu bot financeiro pessoal!*\n\n"
-        "Aqui está o que você pode me pedir:\n\n"
-        "🔴 *Registrar Saída/Gasto:*\n"
-        "`gasto 50 almoço`\n\n"
-        "🟢 *Registrar Entrada/Ganho:*\n"
-        "`entrada 100 pix`\n\n"
-        "📊 *Ver Relatório Mensal:*\n"
-        "`gere o relatorio do mes`"
+    await enviar_mensagem_ajuda(numero)
+
+
+async def enviar_mensagem_ajuda(numero: str):
+    """
+    Envia uma mensagem de ajuda simplificada explicando como o bot funciona e listando suas funcionalidades.
+    """
+    msg_ajuda = (
+        "🐷 *Olá! Sou o Porquinho, seu Cérebro Financeiro no WhatsApp!*\n\n"
+        "💡 *COMO EU FUNCIONO:*\n"
+        "Para eu registrar suas contas sem perder o nexo, basta dizer se é *entrada* ou *saída*, o *valor* e a *descrição* logo após.\n\n"
+        "📋 *EXEMPLOS SIMPLES:*\n"
+        "🟢 *Entrada:* `Entrada 1500 Salario.`\n"
+        "🔴 *Saída:* `Gastei 250 academia.`\n\n"
+        "⚙️ *FUNCIONALIDADES E COMANDOS:*\n\n"
+        "• *Registrar Entrada/Ganho:*\n"
+        "Use palavras como: `entrada`, `recebi` ou `ganhei`\n"
+        "👉 _Exemplo:_ `Entrada 1500 Salario.`\n\n"
+        "• *Registrar Saída/Gasto:*\n"
+        "Use palavras como: `gastei`, `gasto`, `saida` ou `paguei`\n"
+        "👉 _Exemplo:_ `Gastei 250 academia.`\n\n"
+        "• *Relatório e Saldo do Mês:*\n"
+        "Consulta o resumo financeiro atual.\n"
+        "👉 _Exemplo:_ `relatorio` ou `gere o relatorio do mes`\n\n"
+        "• *Ajuda e Menu:*\n"
+        "Exibe esta lista a qualquer momento.\n"
+        "👉 _Exemplo:_ `ajuda` ou `menu`\n\n"
+        "_Dica: Seus dados são 100% privados e vinculados exclusivamente ao seu WhatsApp!_"
     )
-    await enviar_mensagem_whatsapp(numero, mensagem_ajuda)
+    await enviar_mensagem_whatsapp(numero, msg_ajuda)
+
+
+async def obter_ou_criar_usuario(numero: str) -> Dict[str, Any]:
+    """
+    Busca o perfil do usuário na tabela 'financas_usuarios' pelo número de WhatsApp.
+    Se não existir, cria automaticamente com dia_inicio_mes = 1, dia_fechamento_cartao = 1 e receber_alerta_automatico = True.
+    """
+    if supabase is None:
+        return {"telefone": numero, "nome": "Usuário", "plano": "gratuito", "dia_inicio_mes": 1, "dia_fechamento_cartao": 1, "receber_alerta_automatico": True}
+
+    try:
+        consulta = supabase.table("financas_usuarios").select("*").eq("telefone", numero).execute()
+        raw_data = consulta.data or []
+        if raw_data and isinstance(raw_data[0], dict):
+            return dict(raw_data[0])
+        
+        # Cria novo perfil se ainda não existir
+        novo_usuario = {
+            "telefone": numero,
+            "nome": "Usuário",
+            "plano": "gratuito",
+            "dia_inicio_mes": 1,
+            "dia_fechamento_cartao": 1,
+            "receber_alerta_automatico": True
+        }
+        supabase.table("financas_usuarios").insert(novo_usuario).execute()
+        return novo_usuario
+    except Exception as e:
+        print(f"[ERRO] Erro ao obter/criar usuário no Supabase: {e}")
+        return {"telefone": numero, "nome": "Usuário", "plano": "gratuito", "dia_inicio_mes": 1, "dia_fechamento_cartao": 1, "receber_alerta_automatico": True}
 
 
 async def inserir_transacao(numero: str, dados: Dict[str, Any]):
     """
-    Insere o registro APENAS na tabela 'financas_transacoes'.
-    Cumpre estritamente a regra de não interagir com outras tabelas.
-    Envia confirmação via Meta API após a inserção.
+    Insere o registro APENAS na tabela 'financas_transacoes' e garante que o usuário exista em 'financas_usuarios'.
+    Envia confirmação via WhatsApp/Meta API após a inserção.
     """
     if supabase is None:
         await enviar_mensagem_whatsapp(numero, "❌ Erro: Conexão com o banco de dados Supabase não configurada.")
         return
 
     try:
-        # Monta o payload para inserção no Supabase
+        # Garante ou recupera perfil do usuário no banco
+        await obter_ou_criar_usuario(numero)
+
+        # Monta o payload para inserção no Supabase com suporte multi-usuário (isolado por telefone)
         novo_registro = {
+            "telefone": numero,
             "tipo": dados["tipo"],
             "valor": dados["valor"],
             "categoria": dados["categoria"],
@@ -493,7 +560,8 @@ async def inserir_transacao(numero: str, dados: Dict[str, Any]):
 
 async def gerar_e_enviar_relatorio_mensal(numero: str):
     """
-    Busca no Supabase apenas as transações do mês e ano atuais.
+    Busca no Supabase apenas as transações do período financeiro do usuário (`numero`),
+    respeitando a configuração personalizada `dia_inicio_mes` da tabela `financas_usuarios`.
     NÃO deleta, altera ou apaga nenhum dado do banco.
     Soma entradas, subtrai saídas e envia mensagem formatada com o saldo atual via WhatsApp.
     """
@@ -502,21 +570,48 @@ async def gerar_e_enviar_relatorio_mensal(numero: str):
         return
 
     try:
+        usuario = await obter_ou_criar_usuario(numero)
+        val_dia = usuario.get("dia_inicio_mes", 1)
+        try:
+            dia_inicio = int(val_dia) if isinstance(val_dia, (int, str, float)) else 1
+        except (ValueError, TypeError):
+            dia_inicio = 1
+        
         agora = datetime.now()
         ano_atual = agora.year
         mes_atual = agora.month
         
-        # Define os limites de data/hora para a consulta do mês atual no Supabase
-        inicio_mes = datetime(ano_atual, mes_atual, 1, 0, 0, 0).isoformat()
-        if mes_atual == 12:
-            inicio_proximo_mes = datetime(ano_atual + 1, 1, 1, 0, 0, 0).isoformat()
+        # Define os limites de data/hora respeitando o dia de fechamento personalizado do usuário
+        if dia_inicio == 1:
+            inicio_mes_dt = datetime(ano_atual, mes_atual, 1, 0, 0, 0)
+            if mes_atual == 12:
+                inicio_proximo_mes_dt = datetime(ano_atual + 1, 1, 1, 0, 0, 0)
+            else:
+                inicio_proximo_mes_dt = datetime(ano_atual, mes_atual + 1, 1, 0, 0, 0)
         else:
-            inicio_proximo_mes = datetime(ano_atual, mes_atual + 1, 1, 0, 0, 0).isoformat()
+            if agora.day < dia_inicio:
+                # Mês financeiro iniciou no mês anterior
+                if mes_atual == 1:
+                    inicio_mes_dt = datetime(ano_atual - 1, 12, dia_inicio, 0, 0, 0)
+                else:
+                    inicio_mes_dt = datetime(ano_atual, mes_atual - 1, dia_inicio, 0, 0, 0)
+                inicio_proximo_mes_dt = datetime(ano_atual, mes_atual, dia_inicio, 0, 0, 0)
+            else:
+                # Mês financeiro iniciou no mês atual
+                inicio_mes_dt = datetime(ano_atual, mes_atual, dia_inicio, 0, 0, 0)
+                if mes_atual == 12:
+                    inicio_proximo_mes_dt = datetime(ano_atual + 1, 1, dia_inicio, 0, 0, 0)
+                else:
+                    inicio_proximo_mes_dt = datetime(ano_atual, mes_atual + 1, dia_inicio, 0, 0, 0)
 
-        # Consulta APENAS leitura (SELECT) na tabela financas_transacoes filtrada por data
+        inicio_mes = inicio_mes_dt.isoformat()
+        inicio_proximo_mes = inicio_proximo_mes_dt.isoformat()
+
+        # Consulta APENAS leitura (SELECT) na tabela financas_transacoes filtrada por usuário e período
         consulta = (
             supabase.table("financas_transacoes")
             .select("tipo, valor, created_at")
+            .eq("telefone", numero)
             .gte("created_at", inicio_mes)
             .lt("created_at", inicio_proximo_mes)
             .execute()
@@ -563,7 +658,157 @@ async def gerar_e_enviar_relatorio_mensal(numero: str):
 
 
 # -----------------------------------------------------------------------------------------
-# 6. ROTA DE SAÚDE DA API (HEALTHCHECK)
+# 6. ROTA DA API DO DASHBOARD WEB (GET /api/dashboard)
+# -----------------------------------------------------------------------------------------
+@app.get("/api/dashboard")
+async def obter_dados_dashboard(telefone: Optional[str] = None):
+    """
+    Endpoint GET para fornecer dados consolidados e transações em tempo real
+    para o Dashboard Web React (somente leitura na tabela financas_transacoes).
+    """
+    if not telefone:
+        return {"status": "error", "message": "Parâmetro 'telefone' é obrigatório."}
+
+    # Normaliza o número do telefone removendo caracteres não numéricos
+    numero = re.sub(r"\D", "", telefone.strip())
+    if not numero:
+        return {"status": "error", "message": "Número de telefone inválido."}
+
+    if supabase is None:
+        raise HTTPException(status_code=500, detail="Banco de dados Supabase não conectado.")
+
+    try:
+        # Consulta o usuário para obter configurações de período financeiro e dados de perfil
+        consulta_user = (
+            supabase.table("financas_usuarios")
+            .select("nome, plano, dia_inicio_mes")
+            .eq("telefone", numero)
+            .execute()
+        )
+        user_raw = consulta_user.data or []
+        usuarios: list[dict[str, Any]] = [dict(u) for u in user_raw if isinstance(u, dict)]
+        
+        if not usuarios:
+            return {
+                "status": "not_found",
+                "message": "Número não encontrado. Envie uma mensagem para o Porquinho no WhatsApp para iniciar!"
+            }
+
+        usuario_data: dict[str, Any] = usuarios[0]
+        nome = str(usuario_data.get("nome", "Usuário"))
+        plano = str(usuario_data.get("plano", "gratuito"))
+        val_dia = usuario_data.get("dia_inicio_mes", 1)
+        try:
+            dia_inicio = int(val_dia) if isinstance(val_dia, (int, str, float)) else 1
+        except (ValueError, TypeError):
+            dia_inicio = 1
+
+        # Calcula as datas de início e fim do período financeiro atual do usuário
+        agora = datetime.now()
+        ano_atual = agora.year
+        mes_atual = agora.month
+
+        if dia_inicio == 1:
+            inicio_mes_dt = datetime(ano_atual, mes_atual, 1, 0, 0, 0)
+            if mes_atual == 12:
+                inicio_proximo_mes_dt = datetime(ano_atual + 1, 1, 1, 0, 0, 0)
+            else:
+                inicio_proximo_mes_dt = datetime(ano_atual, mes_atual + 1, 1, 0, 0, 0)
+        else:
+            if agora.day < dia_inicio:
+                if mes_atual == 1:
+                    inicio_mes_dt = datetime(ano_atual - 1, 12, dia_inicio, 0, 0, 0)
+                else:
+                    inicio_mes_dt = datetime(ano_atual, mes_atual - 1, dia_inicio, 0, 0, 0)
+                inicio_proximo_mes_dt = datetime(ano_atual, mes_atual, dia_inicio, 0, 0, 0)
+            else:
+                inicio_mes_dt = datetime(ano_atual, mes_atual, dia_inicio, 0, 0, 0)
+                if mes_atual == 12:
+                    inicio_proximo_mes_dt = datetime(ano_atual + 1, 1, dia_inicio, 0, 0, 0)
+                else:
+                    inicio_proximo_mes_dt = datetime(ano_atual, mes_atual + 1, dia_inicio, 0, 0, 0)
+
+        inicio_mes = inicio_mes_dt.isoformat()
+        inicio_proximo_mes = inicio_proximo_mes_dt.isoformat()
+
+        # Consulta APENAS leitura (SELECT) na tabela financas_transacoes
+        consulta_transacoes = (
+            supabase.table("financas_transacoes")
+            .select("id, created_at, tipo, valor, categoria, descricao")
+            .eq("telefone", numero)
+            .gte("created_at", inicio_mes)
+            .lt("created_at", inicio_proximo_mes)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        
+        raw_data = consulta_transacoes.data or []
+        transacoes: list[dict[str, Any]] = [dict(item) for item in raw_data if isinstance(item, dict)]
+
+        total_entradas = 0.0
+        total_gastos = 0.0
+        categorias_map: dict[str, float] = {}
+
+        lista_formatada: list[dict[str, Any]] = []
+        for t in transacoes:
+            try:
+                valor = float(t.get("valor", 0.0))
+            except (ValueError, TypeError):
+                valor = 0.0
+
+            tipo = str(t.get("tipo", "")).lower()
+            if tipo == "entrada":
+                total_entradas += valor
+            elif tipo == "gasto":
+                total_gastos += valor
+                cat = str(t.get("categoria") or "Outros").strip()
+                if not cat:
+                    cat = "Outros"
+                categorias_map[cat] = categorias_map.get(cat, 0.0) + valor
+
+            lista_formatada.append({
+                "id": str(t.get("id", "")),
+                "created_at": str(t.get("created_at", "")),
+                "tipo": tipo,
+                "valor": round(valor, 2),
+                "categoria": str(t.get("categoria", "Outros")),
+                "descricao": str(t.get("descricao", ""))
+            })
+
+        saldo_atual = total_entradas - total_gastos
+
+        return {
+            "status": "success",
+            "usuario": {
+                "telefone": numero,
+                "nome": nome,
+                "plano": plano,
+                "dia_inicio_mes": dia_inicio,
+                "periodo": {
+                    "inicio": inicio_mes,
+                    "fim": inicio_proximo_mes,
+                    "mes_referencia": f"{mes_atual:02d}/{ano_atual}"
+                }
+            },
+            "resumo": {
+                "entradas": round(total_entradas, 2),
+                "gastos": round(total_gastos, 2),
+                "saldo": round(saldo_atual, 2)
+            },
+            "categorias": [
+                {"categoria": k, "valor": round(v, 2)}
+                for k, v in sorted(categorias_map.items(), key=lambda x: x[1], reverse=True)
+            ],
+            "transacoes": lista_formatada
+        }
+
+    except Exception as e:
+        print(f"[ERRO] Erro na rota /api/dashboard: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno ao consultar dados do dashboard.")
+
+
+# -----------------------------------------------------------------------------------------
+# 7. ROTA DE SAÚDE DA API (HEALTHCHECK)
 # -----------------------------------------------------------------------------------------
 @app.get("/")
 async def health_check():

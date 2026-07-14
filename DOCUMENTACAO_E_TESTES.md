@@ -25,16 +25,24 @@ O projeto adota a separação de responsabilidades em dois serviços independent
 
 ## 2. O QUE JÁ FOI DESENVOLVIDO E CONFIGURADO
 
-### ✅ Banco de Dados (`schema.sql`)
-- Tabela criada e configurada: **`financas_transacoes`**
-- Colunas:
-  - `id` (UUID, Primary Key, gerado automaticamente)
-  - `tipo` (TEXT, aceita `'gasto'` ou `'entrada'`)
-  - `valor` (NUMERIC(10,2), maior que zero)
-  - `categoria` (TEXT)
-  - `descricao` (TEXT)
-  - `created_at` (TIMESTAMPTZ, default `NOW()`)
-- Políticas de segurança e índices otimizados aplicados.
+### ✅ Banco de Dados (`schema.sql` - Suporte Multi-Usuário / Multi-Tenant)
+- **Tabela 1: `financas_usuarios` (Perfis e Configurações de Período Personalizado)**
+  - `telefone` (VARCHAR(30), Primary Key) ➔ Identificador único do usuário no WhatsApp (Chave Estrangeira com transações).
+  - `nome` (VARCHAR(100), default `'Usuário'`) ➔ Nome do usuário para atendimento intimista.
+  - `plano` (VARCHAR(20), default `'gratuito'`) ➔ Plano de assinatura (`gratuito`, `premium`, `empresarial`).
+  - `dia_inicio_mes` (INTEGER, default `1`) ➔ Dia em que o mês financeiro do usuário inicia e reinicia (1 a 31).
+  - `dia_fechamento_cartao` (INTEGER, default `1`) ➔ Dia em que a fatura do cartão fecha para relatórios automáticos.
+  - `receber_alerta_automatico` (BOOLEAN, default `true`) ➔ Se o usuário quer receber o relatório automático no dia de fechamento.
+  - `created_at` e `updated_at` (TIMESTAMPTZ).
+- **Tabela 2: `financas_transacoes` (Transações Isoladas por Usuário)**
+  - `id` (UUID, Primary Key, gerado automaticamente).
+  - `created_at` (TIMESTAMPTZ, default `NOW()`).
+  - `telefone` (VARCHAR(30), Not Null, índice por tenant) ➔ Conecta a transação ao seu proprietário.
+  - `tipo` (TEXT, aceita `'gasto'` ou `'entrada'`).
+  - `valor` (NUMERIC(10,2), maior que zero).
+  - `categoria` (TEXT).
+  - `descricao` (TEXT).
+- Políticas de segurança (RLS) e índices otimizados por usuário (`idx_financas_transacoes_telefone_created_at`) aplicados.
 
 ### ✅ Backend Principal (`main.py`)
 - **Conexão Segura e Tipada com Supabase:** Configurada com `Optional[Client]` e validação explícita (`if supabase is None:` e guardas de tipo para evitar erros `NoneType` no Pyrefly/Pyright).
@@ -53,12 +61,14 @@ O projeto adota a separação de responsabilidades em dois serviços independent
       1. Evolution API: `cd evolution-api` e `node dist/main.js`
       2. Cérebro Python: `py -m uvicorn main:app --host 0.0.0.0 --port 8000`
     - Painel e Webhook local configurado: `http://localhost:8080/manager` (Webhook para `http://localhost:8000/webhook-evolution`).
+- **Gestão de Perfil de Usuário (`obter_ou_criar_usuario`):**
+  - Consulta o cadastro em `financas_usuarios` por `telefone`. Cria automaticamente um perfil com `dia_inicio_mes = 1` caso seja um novo usuário.
 - **Registro de Transações (`inserir_transacao`):**
   - Parse inteligente de valores monetários com vírgula ou ponto (ex: `45,50` ou `45.50`).
-  - Inserção na tabela `financas_transacoes`.
+  - Inserção na tabela `financas_transacoes` vinculada ao `telefone` do usuário.
   - Envio de recibo formatado via WhatsApp.
 - **Relatório Mensal (`gerar_e_enviar_relatorio_mensal`):**
-  - Consulta apenas leitura (`SELECT`) das transações do mês e ano correntes.
+  - Consulta apenas leitura (`SELECT`) das transações filtradas estritamente por `telefone` e pelo intervalo de datas do período financeiro (`dia_inicio_mes`).
   - **Nunca altera ou exclui registros do banco.**
   - Cálculo automático de Total de Entradas, Total de Gastos e Saldo Atual com ícones dinâmicos.
 
@@ -66,8 +76,8 @@ O projeto adota a separação de responsabilidades em dois serviços independent
 
 ## 3. REGRAS INEGOCIÁVEIS DO SISTEMA (PARA A IA SEGUIR)
 
-1. **Isolamento de Tabelas:**
-   - Todas as operações financeiras devem interagir **exclusivamente** com a tabela `financas_transacoes`. Nunca crie dependências com outras tabelas sem solicitação explícita do usuário.
+1. **Isolamento e Escopo de Tabelas:**
+   - Todas as operações financeiras e de perfis devem interagir **exclusivamente** com as tabelas do ecossistema Porquinho (`financas_transacoes` e `financas_usuarios`). Nunca crie ou altere dependências com outras tabelas sem solicitação explícita do usuário.
 2. **Imutabilidade Histórica nos Relatórios:**
    - A função de relatório mensal **NUNCA** pode executar `DELETE`, `UPDATE` ou `DROP`. Ela deve apenas ler (`SELECT`) os dados do mês vigente.
 3. **Robustez na Tipagem (Linter Pyrefly / Pyright):**
@@ -106,16 +116,27 @@ Garantir que os seguintes formatos sejam reconhecidos corretamente:
 ### 🔹 Teste 5: Isolamento de Relatório Mensal
 - [ ] Verificar se o comando `gere o relatorio do mes` (ou variações como `relatorio`) aciona apenas consulta `SELECT` com filtros `>= inicio_mes` e `< inicio_proximo_mes`.
 
+### 🔹 Teste 6: Validação da Rota do Dashboard Web (`GET /api/dashboard`) e Build do React
+- [ ] O endpoint `GET /api/dashboard?telefone={numero}` deve realizar exclusivamente leitura (`SELECT`) na tabela `financas_transacoes` e `financas_usuarios`.
+- [ ] O projeto frontend na pasta `dashboard-react` deve compilar sem erros via `npm run build` na Vercel ou localmente.
+
 ---
 
 ## 5. ROADMAP / PRÓXIMAS ATIVIDADES PROGRAMADAS
 
-### 🚀 [EM FOCO PARA AMANHÃ] Atividade 1: Comando interativo de AJUDA / HELP pelo WhatsApp
-- **Objetivo:** Criar uma resposta organizada e elegante quando o usuário enviar comandos como `Help`, `Ajuda`, `Comandos` ou `?` no WhatsApp.
-- **O que deverá retornar:**
-  1. Uma lista bonita com as funções e comandos do Porquinho (o usuário irá estruturar as funções desejadas para o menu).
-  2. Exemplos práticos de como registrar entradas e gastos.
-  3. Guia de relatórios e consultas.
+### ✅ [CONCLUÍDO] Atividade 1: Comando interativo de AJUDA / HELP pelo WhatsApp
+- **Status:** Concluído com sucesso (função `enviar_mensagem_ajuda` no Cérebro e interceptação case-insensitive para `ajuda`, `help`, `menu`, `comandos`, `?`, `oi`, `olá`, etc.).
+- **Objetivo:** Criar uma resposta organizada e elegante quando o usuário enviar comandos ou mensagens não reconhecidas no WhatsApp.
+- **Entregáveis do Menu:**
+  1. Explicação sucinta de como enviar comandos sem perder o nexo (`gasto <valor> <descrição>` ou `entrada <valor> <descrição>`).
+  2. Lista das funcionalidades ativas (Gastos, Entradas, Relatório sob demanda e Ajuda).
+  3. Dica de privacidade vinculando os dados ao número do WhatsApp.
+
+### 🌐 [BLUEPRINT DE EXPANSÃO SAAS] Atividades Futuras de Expansão do Ecossistema Relacional
+- **Objetivo:** Conforme o sistema crescer para milhares de usuários, criar as tabelas complementares:
+  1. **`financas_orcamentos` (Limites & Alertas):** Alerta em tempo real no WhatsApp ao atingir x% do limite mensal por categoria.
+  2. **`financas_recorrencias` (Parcelamentos & Assinaturas):** Lançamento automatizado em segundo plano para compras parceladas ou assinaturas recorrentes (ex: Netflix, parcela da geladeira).
+  3. **`financas_categorias` (Categorias Personalizadas):** Customização pelo usuário ou pequena empresa com ícones e cores para relatórios no Dashboard Web.
 
 ### ☁️ [CONCLUÍDO - RENDER.COM] Atividade 2: Publicação e Hospedagem 24/7 na Nuvem
 - **Status:** Concluído com sucesso no Render.com (URL oficial conectada com Webhook da Meta e Token Permanente).
@@ -126,10 +147,16 @@ Garantir que os seguintes formatos sejam reconhecidos corretamente:
   3. ✅ Substituição da URL do túnel temporário pela URL HTTPS oficial definitiva (`porquinhowhatsapp.onrender.com/webhook`).
   4. ✅ Funcionamento 24/7 autônomo.
 
-### 📊 Atividade 3: Dashboard Financeiro Web Visual (Gráficos e Extrato no Navegador)
-- **Objetivo:** Criar uma interface web moderna, visual e responsiva servida pelo próprio FastAPI (ex: `/dashboard`) para o usuário visualizar suas finanças em gráficos e extratos.
-- **Entregáveis da Atividade:**
-  1. Página HTML + Vanilla CSS com design moderno (Modo Escuro premium / Glassmorphism / Cores vibrantes).
-  2. Cards com resumo de Entradas, Gastos e Saldo em tempo real.
-  3. Gráfico visual (ex: Chart.js) mostrando a divisão de gastos por categoria.
-  4. Tabela interativa com histórico recente de transações (somente leitura na tabela `financas_transacoes`).
+### ✅ [CONCLUÍDO - REACT / VERCEL + FASTAPI CORS] Atividade 3: Dashboard Financeiro Web Visual (Gráficos e Extrato no Navegador)
+- **Status:** Concluído com sucesso utilizando **React (Vite + React)** para deploy na **Vercel**, integrado ao backend FastAPI através da rota com CORS `GET /api/dashboard?telefone={numero}`.
+- **Objetivo:** Criar uma interface web moderna, visual e responsiva com foco na versão mobile para o usuário visualizar suas finanças em gráficos e extratos.
+- **Paleta de Cores & Design:** Fundo Preto Profundo (`#070a12`) com cartões em Azul Navy (`#111d3b`) em estilo Glassmorphism, limpo e profissional.
+- **Entregáveis Concluídos:**
+  1. ✅ Projeto React na pasta `dashboard-react/` configurado com design system e responsividade mobile-first (`Header.jsx`, `SummaryCards.jsx`, `CategoryChart.jsx`, `TransactionsTable.jsx`).
+  2. ✅ Cards com resumo de Entradas, Gastos e Saldo atualizados em tempo real do Supabase com formatação `R$`.
+  3. ✅ Gráfico visual com `Chart.js` (`react-chartjs-2`) demonstrando a divisão de gastos por categoria.
+  4. ✅ Tabela interativa com extrato recente, rolagem horizontal otimizada para celular e badges coloridas (somente leitura na tabela `financas_transacoes`).
+  5. ✅ **Como fazer o deploy na Vercel:**
+     - Conecte o repositório no painel da Vercel e selecione a pasta `dashboard-react` como **Root Directory**.
+     - Crie a variável de ambiente `VITE_API_URL` apontando para a URL pública do Render (ex: `https://porquinhowhatsapp.onrender.com`).
+     - A Vercel executará `npm run build` e publicará o dashboard instantaneamente com SSL e CDN globais.

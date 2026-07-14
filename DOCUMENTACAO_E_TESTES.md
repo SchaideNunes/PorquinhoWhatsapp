@@ -7,16 +7,16 @@
 
 ## 1. VISÃO GERAL DO PROJETO E ARQUITETURA
 
-O **Porquinho WhatsApp** é um assistente financeiro pessoal de ponta integrado diretamente ao WhatsApp por meio da **API Oficial da Meta (Cloud API)**, com backend em **Python 3 / FastAPI** e banco de dados relacional **Supabase (PostgreSQL)**.
+O **Porquinho WhatsApp** é um assistente financeiro pessoal de ponta integrado diretamente ao WhatsApp por meio da **Evolution API (Baileys / QR Code)**, com backend em **Python 3 / FastAPI** e banco de dados relacional **Supabase (PostgreSQL)**.
 
 ### Stack Tecnológica & Separação de Responsabilidades (Arquitetura Modular)
 O projeto adota a separação de responsabilidades em dois serviços independentes para máxima estabilidade e segurança:
 1. **O "Carteiro" (Evolution API v2.3.7 - Node.js / TypeScript):**
-   - Responsável exclusivamente pela conectividade bruta com o WhatsApp via QR Code (`Baileys`), criptografia de sessão e envio/recebimento de mensagens em tempo real.
+   - Responsável exclusivamente pela conectividade bruta com o WhatsApp via QR Code (`Baileys`), criptografia de sessão e envio/recebimento de mensagens em tempo real sem depender da Meta Developers.
    - Não possui lógica de negócio ou acesso às tabelas financeiras do usuário.
 2. **O "Cérebro Financeiro" (Porquinho WhatsApp - Python 3 / FastAPI):**
    - Responsável pelo processamento de linguagem natural, regras financeiras, categorização e persistência na tabela `financas_transacoes` do Supabase.
-   - Recebe notificações do "Carteiro" via Webhook (`http://localhost:8000/webhook-evolution`) e instrui a Evolution API a enviar respostas ao usuário.
+   - Recebe notificações do "Carteiro" via Webhook (`http://localhost:8000/webhook-evolution` ou URL do Render) e instrui a Evolution API a enviar respostas ao usuário.
 
 - **Banco de Dados:** Supabase (PostgreSQL 15+) utilizando a biblioteca oficial `supabase-py` no Cérebro Python e Prisma na Evolution API.
 - **Ambiente Local Autônomo (2 Cliques):** Execução local integrada via `rodar_evolution_api.bat` (porta 8080) e `rodar_porquinho.bat` (porta 8000).
@@ -46,13 +46,11 @@ O projeto adota a separação de responsabilidades em dois serviços independent
 
 ### ✅ Backend Principal (`main.py`)
 - **Conexão Segura e Tipada com Supabase:** Configurada com `Optional[Client]` e validação explícita (`if supabase is None:` e guardas de tipo para evitar erros `NoneType` no Pyrefly/Pyright).
-- **Verificação de Webhook (`GET /webhook`):** Validação oficial do `hub.verify_token` (`schaide123`) respondendo com o `hub.challenge` para a Meta Cloud API.
-- **Recebimento de Mensagens Meta API (`POST /webhook`):**
-  - Leitura segura e tipada de estruturas JSON aninhadas da Meta.
 - **Recebimento de Mensagens Evolution API (`POST /webhook-evolution`):**
-  - Leitura assíncrona de eventos `messages.upsert` do WhatsApp Não-Oficial (QR Code).
+  - Leitura assíncrona de eventos `messages.upsert` do WhatsApp via QR Code.
   - Normalização de texto (`lower()`, `strip()`) tornando os comandos **case-insensitive**.
   - Suporte a sinônimos de entrada e saída (`gasto`, `gastei`, `saida`, `saída`, `paguei`, `entrada`, `entrei`, `recebi`, `ganhei`, `deposito`, `depósito`).
+  - Rota de Webhook secundária e fallback mantida para retrocompatibilidade técnica (`POST /webhook` e `GET /webhook`).
   - **Servidor Local Evolution API v2.3.7 + Cérebro Python no Supabase Dedicado (PorquinhoWhatsapp):**
     - A Evolution API e o Cérebro Python rodam localmente no computador do usuário, 100% integrados e salvando sessões, instâncias e transações no banco dedicado **`PorquinhoWhatsapp`** na nuvem do Supabase.
     - **Como rodar o Servidor do WhatsApp (Evolution API):** Dê 2 cliques em `rodar_evolution_api.bat` (porta 8080).
@@ -101,10 +99,9 @@ Sempre que a IA modificar o código ou adicionar uma nova funcionalidade, **deve
 ### 🔹 Teste 2: Validação do Endpoint de Healthcheck (`GET /`)
 - [ ] O servidor deve responder `200 OK` na rota raiz `/` indicando o status operacional e se o Supabase está conectado.
 
-### 🔹 Teste 3: Validação do Webhook da Meta (`GET /webhook`)
-- [ ] Enviar requisição simulando a Meta:
-  `GET /webhook?hub.mode=subscribe&hub.verify_token=schaide123&hub.challenge=115599`
-- [ ] O backend deve retornar status `200 OK` com o corpo em texto plano contendo exatamente `115599`.
+### 🔹 Teste 3: Validação do Webhook da Evolution API (`POST /webhook-evolution`)
+- [ ] Enviar payload JSON simulando o evento `messages.upsert` da Evolution API.
+- [ ] O backend deve processar a mensagem sem erros e responder status `200 OK`.
 
 ### 🔹 Teste 4: Parser de Linguagem Natural (`extrair_dados_transacao`)
 Garantir que os seguintes formatos sejam reconhecidos corretamente:
@@ -139,12 +136,12 @@ Garantir que os seguintes formatos sejam reconhecidos corretamente:
   3. **`financas_categorias` (Categorias Personalizadas):** Customização pelo usuário ou pequena empresa com ícones e cores para relatórios no Dashboard Web.
 
 ### ☁️ [CONCLUÍDO - RENDER.COM] Atividade 2: Publicação e Hospedagem 24/7 na Nuvem
-- **Status:** Concluído com sucesso no Render.com (URL oficial conectada com Webhook da Meta e Token Permanente).
+- **Status:** Concluído com sucesso no Render.com (URL HTTPS oficial ativa conectada ao Webhook da Evolution API).
 - **Objetivo:** Publicar o backend FastAPI em uma plataforma de nuvem gratuita para que o Porquinho funcione 24 horas por dia, 7 dias por semana.
 - **Entregáveis da Atividade:**
   1. ✅ Criação do arquivo `Procfile` e comando de inicialização.
   2. ✅ Configuração segura das variáveis de ambiente (`.env`) no painel do Render.
-  3. ✅ Substituição da URL do túnel temporário pela URL HTTPS oficial definitiva (`porquinhowhatsapp.onrender.com/webhook`).
+  3. ✅ Conexão da URL HTTPS definitiva do Render com a instância da Evolution API (`/webhook-evolution`).
   4. ✅ Funcionamento 24/7 autônomo.
 
 ### ✅ [CONCLUÍDO - REACT / VERCEL + FASTAPI CORS] Atividade 3: Dashboard Financeiro Web Visual (Gráficos e Extrato no Navegador)

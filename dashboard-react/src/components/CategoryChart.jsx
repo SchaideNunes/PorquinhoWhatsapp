@@ -47,17 +47,26 @@ export default function CategoryChart({ categorias }) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: {
+        top: 8,
+        bottom: 12,
+        left: 12,
+        right: 12
+      }
+    },
     plugins: {
       legend: {
         position: 'bottom',
         labels: {
           color: '#e2e8f0',
+          boxWidth: 10,
           font: {
             family: "'Inter', sans-serif",
             size: 12,
             weight: '600'
           },
-          padding: 16,
+          padding: 14,
           usePointStyle: true,
           pointStyle: 'circle'
         },
@@ -84,7 +93,7 @@ export default function CategoryChart({ categorias }) {
         }
       },
     },
-    cutout: '65%',
+    cutout: '66%',
   };
 
   return (

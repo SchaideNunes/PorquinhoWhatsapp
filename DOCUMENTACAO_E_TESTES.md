@@ -9,11 +9,17 @@
 
 O **Porquinho WhatsApp** é um assistente financeiro pessoal de ponta integrado diretamente ao WhatsApp por meio da **API Oficial da Meta (Cloud API)**, com backend em **Python 3 / FastAPI** e banco de dados relacional **Supabase (PostgreSQL)**.
 
-### Stack Tecnológica
-- **Backend:** Python 3.10+, FastAPI, Uvicorn, Httpx (comunicação assíncrona com a Meta Cloud API).
-- **Banco de Dados:** Supabase (PostgreSQL 15+) utilizando a biblioteca oficial `supabase-py`.
-- **Canal do Usuário:** WhatsApp via Meta Cloud API (Webhook para recebimento + Graph API para envio).
-- **Ambiente de Teste Local:** Túnel HTTPS via Cloudflare (`cloudflared`) ou SSH (`localhost.run`/`pinggy`).
+### Stack Tecnológica & Separação de Responsabilidades (Arquitetura Modular)
+O projeto adota a separação de responsabilidades em dois serviços independentes para máxima estabilidade e segurança:
+1. **O "Carteiro" (Evolution API v2.3.7 - Node.js / TypeScript):**
+   - Responsável exclusivamente pela conectividade bruta com o WhatsApp via QR Code (`Baileys`), criptografia de sessão e envio/recebimento de mensagens em tempo real.
+   - Não possui lógica de negócio ou acesso às tabelas financeiras do usuário.
+2. **O "Cérebro Financeiro" (Porquinho WhatsApp - Python 3 / FastAPI):**
+   - Responsável pelo processamento de linguagem natural, regras financeiras, categorização e persistência na tabela `financas_transacoes` do Supabase.
+   - Recebe notificações do "Carteiro" via Webhook (`http://localhost:8000/webhook-evolution`) e instrui a Evolution API a enviar respostas ao usuário.
+
+- **Banco de Dados:** Supabase (PostgreSQL 15+) utilizando a biblioteca oficial `supabase-py` no Cérebro Python e Prisma na Evolution API.
+- **Ambiente Local Autônomo (2 Cliques):** Execução local integrada via `rodar_evolution_api.bat` (porta 8080) e `rodar_porquinho.bat` (porta 8000).
 
 ---
 

@@ -92,25 +92,9 @@ async def enviar_mensagem_whatsapp(numero_destino: str, texto_mensagem: str) -> 
     """
     Envia uma mensagem de texto.
     Prioriza a Evolution API (WhatsApp Não-Oficial via QR Code) se configurada.
-    Caso contrário, utiliza a API Oficial da Meta (Cloud API).
+    Caso contrário, tenta Green API ou API Oficial da Meta (Cloud API).
     """
-    # 1. Envio via Green API (Grátis QR Code Cloud)
-    if GREEN_API_ID and GREEN_API_TOKEN:
-        url = f"https://api.green-api.com/waInstance{GREEN_API_ID}/sendMessage/{GREEN_API_TOKEN}"
-        chat_id = f"{numero_destino}@c.us" if "@" not in numero_destino else numero_destino
-        payload = {"chatId": chat_id, "message": texto_mensagem}
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(url, json=payload, timeout=10.0)
-                if response.status_code in [200, 201]:
-                    print(f"[OK] Mensagem enviada via Green API para {numero_destino}.")
-                    return True
-                else:
-                    print(f"[ERRO] Erro ao enviar via Green API ({response.status_code}): {response.text}")
-            except Exception as e:
-                print(f"[ERRO] Exceção na Green API: {e}")
-
-    # 2. Envio via Evolution API
+    # 1. Envio via Evolution API (Prioridade Máxima)
     if EVOLUTION_API_URL and EVOLUTION_API_KEY and EVOLUTION_INSTANCE:
         url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE}"
         headers = {
@@ -134,7 +118,23 @@ async def enviar_mensagem_whatsapp(numero_destino: str, texto_mensagem: str) -> 
                 print(f"[ERRO] Exceção ao conectar com Evolution API: {e}")
                 return False
 
-    # 2. Envio via Meta Cloud API (Fallback)
+    # 2. Envio via Green API (Fallback secundário)
+    if GREEN_API_ID and GREEN_API_TOKEN:
+        url = f"https://api.green-api.com/waInstance{GREEN_API_ID}/sendMessage/{GREEN_API_TOKEN}"
+        chat_id = f"{numero_destino}@c.us" if "@" not in numero_destino else numero_destino
+        payload = {"chatId": chat_id, "message": texto_mensagem}
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(url, json=payload, timeout=10.0)
+                if response.status_code in [200, 201]:
+                    print(f"[OK] Mensagem enviada via Green API para {numero_destino}.")
+                    return True
+                else:
+                    print(f"[ERRO] Erro ao enviar via Green API ({response.status_code}): {response.text}")
+            except Exception as e:
+                print(f"[ERRO] Exceção na Green API: {e}")
+
+    # 3. Envio via Meta Cloud API (Fallback)
     if not META_ACCESS_TOKEN or not META_PHONE_NUMBER_ID:
         print("[AVISO] Tokens da Meta API não configurados no .env.")
         return False

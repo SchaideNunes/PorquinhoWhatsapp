@@ -51,15 +51,17 @@ const getCategoryIcon = (categoria, isEntrada) => {
   return <Sparkles size={19} />;
 };
 
+const formatarTextoCapitalizado = (str) => {
+  if (!str) return '---';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 export default function TransactionsTable({ transacoes }) {
   if (!transacoes || transacoes.length === 0) {
     return (
       <div className="glass-card table-section animate-fade-in">
-        <div className="section-header">
-          <h2 className="section-title">
-            <ListOrdered size={20} color="#38bdf8" />
-            <span>Últimas Transações</span>
-          </h2>
+        <div className="ref-tx-header">
+          <h2 className="ref-tx-main-title">Últimas Transações</h2>
         </div>
         <div className="empty-state">
           <Clock size={48} opacity={0.3} />
@@ -70,38 +72,36 @@ export default function TransactionsTable({ transacoes }) {
   }
 
   return (
-    <div className="glass-card table-section animate-fade-in">
-      <div className="section-header">
-        <h2 className="section-title">
-          <ListOrdered size={20} color="#38bdf8" />
-          <span>Últimas Transações</span>
-        </h2>
-        <span className="tx-count-badge">{transacoes.length} transações</span>
+    <div className="glass-card table-section animate-fade-in" style={{ padding: '1.5rem 1.75rem' }}>
+      <div className="ref-tx-header">
+        <h2 className="ref-tx-main-title">Últimas Transações</h2>
+        <span className="ref-tx-showall">Ver todas ({transacoes.length}) ›</span>
       </div>
 
-      <div className="compact-transactions-list">
-        {transacoes.map((item) => {
+      <div className="ref-tx-list-rows">
+        {transacoes.map((item, index) => {
           const isEntrada = item.tipo === 'entrada';
+          const tituloPrincipal = item.descricao ? formatarTextoCapitalizado(item.descricao) : (item.categoria || 'Transação');
+          const subtitulo = item.categoria ? formatarTextoCapitalizado(item.categoria) : 'Geral';
+
           return (
-            <div key={item.id || Math.random()} className="ref-tx-card">
-              <div className="ref-tx-left">
+            <div key={item.id || index} className="ref-tx-row">
+              <div className="ref-tx-row-left">
                 <div className={`ref-tx-avatar ${isEntrada ? 'entrada' : 'gasto'}`}>
                   {getCategoryIcon(item.categoria, isEntrada)}
                 </div>
                 <div className="ref-tx-info">
-                  <span className="ref-tx-title">{item.categoria || 'Geral'}</span>
-                  <span className="ref-tx-subtitle">
-                    {item.descricao || 'Sem descrição'} • {formatarData(item.created_at)}
-                  </span>
+                  <span className="ref-tx-title">{tituloPrincipal}</span>
+                  <span className="ref-tx-subtitle">{subtitulo}</span>
                 </div>
               </div>
 
-              <div className="ref-tx-right">
+              <div className="ref-tx-row-right">
                 <span className={`col-valor ${isEntrada ? 'entrada' : 'gasto'}`}>
                   {isEntrada ? '+ ' : '- '}
                   {formatarMoeda(item.valor)}
                 </span>
-                <span className={`ref-tx-type-badge ${isEntrada ? 'entrada' : 'gasto'}`}>
+                <span className="ref-tx-account-label">
                   {isEntrada ? 'Entrada' : 'Gasto'}
                 </span>
               </div>

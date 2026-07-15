@@ -455,47 +455,54 @@
 }
 
 /* Reference Design Components (Keeping Deep Navy / Cyan Palette) */
-.tx-count-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.2rem 0.65rem;
-  background: rgba(56, 189, 248, 0.1);
-  color: var(--cyan);
-  border-radius: 9999px;
-  border: 1px solid rgba(56, 189, 248, 0.25);
-}
-
-.compact-transactions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  width: 100%;
-}
-
-.ref-tx-card {
+/* Reference Design Components (Keeping Deep Navy / Cyan Palette) */
+.ref-tx-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
-  background: rgba(17, 29, 59, 0.55);
-  border: 1px solid rgba(56, 116, 203, 0.18);
-  border-radius: var(--radius-lg);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.ref-tx-main-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+}
+
+.ref-tx-showall {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cyan);
+  cursor: pointer;
+}
+
+.ref-tx-list-rows {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.ref-tx-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background-color 0.15s ease;
   width: 100%;
   box-sizing: border-box;
 }
 
-.ref-tx-card:hover {
-  background: rgba(30, 41, 59, 0.8);
-  border-color: rgba(56, 189, 248, 0.35);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+.ref-tx-row:last-child {
+  border-bottom: none;
 }
 
-.ref-tx-left {
+.ref-tx-row-left {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 0.95rem;
   min-width: 0;
   flex: 1;
   padding-right: 0.75rem;
@@ -509,19 +516,16 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.06);
 }
 
 .ref-tx-avatar.entrada {
   background: rgba(16, 185, 129, 0.15);
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .ref-tx-avatar.gasto {
   background: rgba(244, 63, 94, 0.15);
   color: #fb7185;
-  border: 1px solid rgba(244, 63, 94, 0.3);
 }
 
 .ref-tx-info {
@@ -547,41 +551,28 @@
   word-break: break-word;
 }
 
-.ref-tx-right {
+.ref-tx-row-right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.2rem;
+  gap: 0.15rem;
   flex-shrink: 0;
-}
-
-.ref-tx-type-badge {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.12rem 0.5rem;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.ref-tx-type-badge.entrada {
-  background: rgba(16, 185, 129, 0.1);
-  color: #34d399;
-}
-
-.ref-tx-type-badge.gasto {
-  background: rgba(244, 63, 94, 0.1);
-  color: #fb7185;
 }
 
 .col-valor {
   font-weight: 800;
-  font-size: 1.08rem;
+  font-size: 1.05rem;
   font-family: var(--font-heading);
 }
 
 .col-valor.entrada { color: var(--emerald); }
 .col-valor.gasto { color: var(--rose); }
+
+.ref-tx-account-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
 
 /* Reference Categories Breakdown with Progress Bars */
 .ref-categories-list {

@@ -96,16 +96,52 @@ export default function CategoryChart({ categorias }) {
     cutout: '66%',
   };
 
+  const formatarMoeda = (val) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+  };
+
+  const totalGastosChart = dataValues.reduce((acc, curr) => acc + (curr || 0), 0);
+
   return (
     <div className="glass-card chart-section animate-fade-in">
       <div className="section-header">
         <h2 className="section-title">
           <PieChart size={20} color="#38bdf8" />
-          <span>Gastos por Categoria</span>
+          <span>Tendência por Categorias</span>
         </h2>
+        <span className="tx-count-badge">Total: {formatarMoeda(totalGastosChart)}</span>
       </div>
+
       <div className="chart-wrapper">
         <Doughnut data={data} options={options} />
+      </div>
+
+      <div className="ref-categories-list">
+        <div className="ref-categories-header">
+          <span>Detalhamento</span>
+          <span>Progresso</span>
+        </div>
+        {categorias.map((cat, index) => {
+          const cor = backgroundColors[index % backgroundColors.length];
+          const pct = totalGastosChart > 0 ? ((cat.valor / totalGastosChart) * 100).toFixed(1) : 0;
+          return (
+            <div key={cat.categoria || index} className="ref-cat-item">
+              <div className="ref-cat-top">
+                <div className="ref-cat-label">
+                  <span className="ref-cat-dot" style={{ backgroundColor: cor }}></span>
+                  <strong>{pct}% {cat.categoria || 'Outros'}</strong>
+                </div>
+                <span className="ref-cat-val">{formatarMoeda(cat.valor)}</span>
+              </div>
+              <div className="ref-progress-track">
+                <div 
+                  className="ref-progress-fill" 
+                  style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: cor }}
+                ></div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

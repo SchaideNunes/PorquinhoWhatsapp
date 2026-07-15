@@ -70,12 +70,22 @@ export default function App() {
     fetchDadosDashboard(numInput);
   };
 
+  const handleReset = () => {
+    setTelefone('');
+    setDados(null);
+    setErrorMsg('');
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.delete('telefone');
+    window.history.pushState({}, '', newUrl);
+  };
+
   return (
     <div className="app-container">
       <Header
         telefoneAtual={telefone}
         onSearch={handleSearch}
         usuario={dados?.usuario}
+        onReset={handleReset}
       />
 
       {errorMsg && (

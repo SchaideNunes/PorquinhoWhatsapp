@@ -370,81 +370,142 @@
   padding: 1.5rem;
 }
 
-.table-responsive {
+/* Compact Transactions List */
+.compact-transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.transactions-table {
+.compact-transaction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem;
+  background: rgba(17, 29, 59, 0.45);
+  border: 1px solid rgba(56, 116, 203, 0.15);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+  box-sizing: border-box;
 }
 
-.transactions-table th {
-  text-align: left;
-  padding: 0.75rem 1rem;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--navy-border);
-  white-space: nowrap;
+.compact-transaction-item:hover {
+  background: rgba(56, 189, 248, 0.06);
+  border-color: rgba(56, 189, 248, 0.3);
 }
 
-.transactions-table td {
-  padding: 1rem;
-  font-size: 0.92rem;
-  border-bottom: 1px solid rgba(56, 116, 203, 0.1);
-  white-space: nowrap;
+.transaction-item-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1;
+  padding-right: 1rem;
 }
 
-.transactions-table tr:hover td {
-  background: rgba(56, 189, 248, 0.04);
+.transaction-item-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.transactions-table tr:last-child td {
-  border-bottom: none;
+.transaction-desc {
+  font-size: 0.98rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: normal;
+  word-break: break-word;
 }
 
-.badge-tipo {
+.badge-tipo-compact {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.65rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
-.badge-tipo.entrada {
+.badge-tipo-compact.entrada {
   background: var(--emerald-bg);
   color: var(--emerald);
 }
 
-.badge-tipo.gasto {
+.badge-tipo-compact.gasto {
   background: var(--rose-bg);
   color: var(--rose);
 }
 
-.badge-categoria {
-  background: rgba(30, 41, 59, 0.8);
-  padding: 0.25rem 0.65rem;
-  border-radius: 6px;
-  font-size: 0.82rem;
-  color: #e2e8f0;
-  border: 1px solid rgba(148, 163, 184, 0.15);
+.transaction-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.badge-categoria-compact {
+  background: rgba(30, 41, 59, 0.9);
+  padding: 0.15rem 0.5rem;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.transaction-date {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.transaction-item-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .col-valor {
   font-weight: 700;
+  font-size: 1.05rem;
   font-family: var(--font-heading);
 }
 
 .col-valor.entrada { color: var(--emerald); }
 .col-valor.gasto { color: var(--rose); }
+
+.header-username {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+}
+
+.reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-btn:hover {
+  background: rgba(244, 63, 94, 0.15);
+  border-color: rgba(244, 63, 94, 0.4);
+  color: #f43f5e;
+}
 
 /* Loading & Error States */
 .loading-container {

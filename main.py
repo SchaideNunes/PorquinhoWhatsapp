@@ -499,6 +499,9 @@ async def enviar_mensagem_ajuda(numero: str):
         "• *Relatório e Saldo do Mês:*\n"
         "Consulta o resumo financeiro atual.\n"
         "👉 _Exemplo:_ `relatorio` ou `gere o relatorio do mes`\n\n"
+        "• *Dashboard Web Visual:*\n"
+        "Acesse seus gráficos e extrato em tempo real no navegador.\n"
+        f"👉 _Link:_ https://porquinho-whatsapp.vercel.app/?telefone={numero}\n\n"
         "• *Trocar seu Nome:*\n"
         "Atualiza o nome pelo qual eu chamo você.\n"
         "👉 _Exemplo:_ `meu nome é Carlos` ou `trocar nome para Ana`\n\n"
@@ -755,23 +758,39 @@ async def obter_dados_dashboard(telefone: Optional[str] = None):
 
     try:
         variacoes = gerar_variacoes_telefone(numero)
-        # Consulta o usuário para obter configurações de período financeiro e dados de perfil
-        consulta_user = (
-            supabase.table("financas_usuarios")
-            .select("telefone, nome, plano, dia_inicio_mes")
-            .in_("telefone", variacoes)
-            .execute()
-        )
-        user_raw = consulta_user.data or []
-        usuarios: list[dict[str, Any]] = [dict(u) for u in user_raw if isinstance(u, dict)]
+        usuarios: list[dict[str, Any]] = []
+        try:
+            # Consulta o usuário para obter configurações de período financeiro e dados de perfil
+            consulta_user = (
+                supabase.table("financas_usuarios")
+                .select("telefone, nome, plano, dia_inicio_mes")
+                .in_("telefone", variacoes)
+                .execute()
+            )
+            user_raw = consulta_user.data or []
+            usuarios = [dict(u) for u in user_raw if isinstance(u, dict)]
+        except Exception as e_user:
+            print(f"[AVISO] Tabela financas_usuarios não acessível ou sem cache ({e_user}). Usando configurações padrão.")
+            usuarios = []
         
         if not usuarios:
-            return {
-                "status": "not_found",
-                "message": "Número não encontrado. Envie uma mensagem para o Porquinho no WhatsApp para iniciar!"
-            }
+            # Verifica se já há transações gravadas antes de falhar (para casos em que o perfil ou a tabela não existem no cache)
+            try:
+                check_t = supabase.table("financas_transacoes").select("id").in_("telefone", variacoes).limit(1).execute()
+                if not check_t.data:
+                    return {
+                        "status": "not_found",
+                        "message": "Número não encontrado ou sem transações no período. Envie uma mensagem para o Porquinho no WhatsApp para iniciar!"
+                    }
+            except Exception:
+                return {
+                    "status": "not_found",
+                    "message": "Número não encontrado no sistema. Envie uma mensagem para o Porquinho no WhatsApp para iniciar!"
+                }
+            usuario_data: dict[str, Any] = {"nome": "Usuário", "plano": "gratuito", "dia_inicio_mes": 1}
+        else:
+            usuario_data = usuarios[0]
 
-        usuario_data: dict[str, Any] = usuarios[0]
         nome = str(usuario_data.get("nome", "Usuário"))
         plano = str(usuario_data.get("plano", "gratuito"))
         val_dia = usuario_data.get("dia_inicio_mes", 1)

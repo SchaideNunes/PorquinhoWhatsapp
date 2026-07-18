@@ -67,18 +67,13 @@ export default function Header({ telefoneAtual, onSearch, usuario, onReset }) {
               </div>
             </div>
 
-            {/* Direita: Pílula de Período (< Mês >) + Botão de Trocar */}
+            {/* Direita: Pílula de Período (< Mês >) */}
             <div className="ref-header-right">
               <div className="ref-period-pill">
                 <ChevronLeft size={16} className="ref-arrow" />
                 <span>{usuario.periodo?.mes_referencia || 'Mês Atual'}</span>
                 <ChevronRight size={16} className="ref-arrow" />
               </div>
-
-              <button onClick={onReset} className="reset-btn" title="Consultar outro número">
-                <LogOut size={15} />
-                <span>Trocar</span>
-              </button>
             </div>
           </div>
         )}

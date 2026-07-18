@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Wallet, Sparkles, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const formatarMoeda = (valor) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -12,62 +12,57 @@ export default function SummaryCards({ resumo }) {
   if (!resumo) return null;
 
   const { entradas = 0, gastos = 0, saldo = 0 } = resumo;
+  
+  // Calcula porcentagem gasta em relação às entradas
+  const percentualGasto = entradas > 0 
+    ? Math.min(Math.round((gastos / entradas) * 100), 100) 
+    : (gastos > 0 ? 100 : 0);
+    
   const isPositivo = saldo >= 0;
 
   return (
-    <div className="ref-summary-container animate-fade-in">
-      {/* Hero Card - Saldo Disponível (Estilo My Budget) */}
-      <div className="ref-hero-balance glass-card">
-        <div className="ref-hero-top">
-          <div className="ref-hero-label">
-            <Wallet size={18} color="#38bdf8" />
-            <span>Saldo Atual do Mês</span>
-          </div>
-          <div className={`ref-hero-pill ${isPositivo ? 'positivo' : 'negativo'}`}>
-            {isPositivo ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-            <span>{isPositivo ? 'Saldo positivo' : 'Atenção aos gastos'}</span>
-          </div>
+    <div className="ref-budget-summary-card glass-card animate-fade-in">
+      {/* Top 3 colunas inspiradas no print: Budgeted / Spent / Left */}
+      <div className="ref-budget-cols">
+        <div className="ref-budget-col">
+          <span className="ref-budget-label">Entradas</span>
+          <span className="ref-budget-val budgeted">{formatarMoeda(entradas)}</span>
         </div>
-        <div className="ref-hero-value" style={{ color: isPositivo ? '#f8fafc' : 'var(--rose)' }}>
-          {formatarMoeda(saldo)}
+
+        <div className="ref-budget-col">
+          <span className="ref-budget-label">Gastos</span>
+          <span className="ref-budget-val spent">{formatarMoeda(gastos)}</span>
         </div>
-        <p className="ref-hero-hint">
-          Balanço geral em tempo real calculado diretamente das suas mensagens no WhatsApp
-        </p>
+
+        <div className="ref-budget-col">
+          <span className="ref-budget-label">Saldo</span>
+          <span className={`ref-budget-val left ${isPositivo ? 'positivo' : 'negativo'}`}>{formatarMoeda(saldo)}</span>
+        </div>
       </div>
 
-      {/* Sub Cards - Entradas e Gastos */}
-      <div className="ref-subcards-grid">
-        <div className="summary-card glass-card">
-          <div className="card-header">
-            <span className="card-title">Entradas (Receitas)</span>
-            <div className="card-icon emerald">
-              <TrendingUp size={20} />
-            </div>
-          </div>
-          <div className="card-value emerald">
-            {formatarMoeda(entradas)}
-          </div>
-          <div className="card-footer">
-            Total recebido e registrado no período
-          </div>
-        </div>
+      {/* Barra de Progresso Horizontal (Budget Track Bar) */}
+      <div className="ref-budget-progress-bg">
+        <div 
+          className={`ref-budget-progress-bar ${!isPositivo ? 'overflow' : ''}`}
+          style={{ width: `${percentualGasto}%` }}
+        />
+      </div>
 
-        <div className="summary-card glass-card">
-          <div className="card-header">
-            <span className="card-title">Gastos (Despesas)</span>
-            <div className="card-icon rose">
-              <TrendingDown size={20} />
-            </div>
-          </div>
-          <div className="card-value rose">
-            {formatarMoeda(gastos)}
-          </div>
-          <div className="card-footer">
-            Total gasto e categorizado
-          </div>
-        </div>
+      {/* Status Footer com Check (✓ You are on track!) */}
+      <div className={`ref-budget-status ${isPositivo ? 'on-track' : 'alert'}`}>
+        {isPositivo ? (
+          <>
+            <CheckCircle2 size={16} className="status-icon" />
+            <span>Saldo positivo e gastos dentro do orçamento!</span>
+          </>
+        ) : (
+          <>
+            <AlertTriangle size={16} className="status-icon" />
+            <span>Atenção: seus gastos superaram as entradas neste período!</span>
+          </>
+        )}
       </div>
     </div>
   );
 }
+

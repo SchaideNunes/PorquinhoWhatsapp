@@ -153,7 +153,10 @@ Garantir que os seguintes formatos sejam reconhecidos corretamente:
   2. ✅ Cards com resumo de Entradas, Gastos e Saldo atualizados em tempo real do Supabase com formatação `R$`.
   3. ✅ Gráfico visual com `Chart.js` (`react-chartjs-2`) demonstrando a divisão de gastos por categoria.
   4. ✅ Tabela interativa com extrato recente, rolagem horizontal otimizada para celular e badges coloridas (somente leitura na tabela `financas_transacoes`).
-  5. ✅ **Como fazer o deploy na Vercel:**
+  5. ✅ **Barra de Navegação Inferior (`BottomNav.jsx`) e Modal Interativo via Web/WhatsApp:**
+     - Navegação fluida em abas (Atividade, Orçamento, Transações e Conta).
+     - Botão Central Flutuante `+` abrindo modal que permite enviar o comando pelo WhatsApp (`wa.me`) ou **salvar diretamente e com segurança no banco relacional via Web (`POST /api/transacao`)** sem sair do site, garantindo isolamento ao telefone (`obter_ou_criar_usuario`), validação blindada no Cérebro Python, envio automático do recibo no WhatsApp e atualização do dashboard em tempo real.
+  6. ✅ **Como fazer o deploy na Vercel:**
      - Conecte o repositório no painel da Vercel e selecione a pasta `dashboard-react` como **Root Directory**.
      - Crie a variável de ambiente `VITE_API_URL` apontando para a URL pública do Render (ex: `https://porquinhowhatsapp.onrender.com`).
      - A Vercel executará `npm run build` e publicará o dashboard instantaneamente com SSL e CDN globais.

@@ -1338,3 +1338,60 @@
   opacity: 1;
   transform: translateX(3px);
 }
+
+/* =========================================================
+   BOTÃO SALVAR DIRETO NO BANCO & ALERTS NO MODAL
+   ========================================================= */
+.db-save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.95rem;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.35);
+  transition: all 0.2s;
+}
+
+.db-save-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.45);
+}
+
+.db-save-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.modal-alert {
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.alert-success {
+  background: rgba(52, 211, 153, 0.15);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  color: #a7f3d0;
+}
+
+.alert-error {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  color: #fecdd3;
+}
+
+.spinner-inline {
+  animation: spin 0.8s linear infinite;
+}

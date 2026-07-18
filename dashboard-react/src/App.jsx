@@ -167,6 +167,7 @@ export default function App() {
             onTabChange={setActiveTab}
             usuario={dados?.usuario}
             telefone={telefone}
+            onRefreshDashboard={() => fetchDadosDashboard(telefone)}
           />
         </div>
       )}

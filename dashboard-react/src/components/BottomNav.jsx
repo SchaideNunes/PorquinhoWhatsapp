@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Activity, Wallet, Receipt, User, Plus, X, ArrowRight, Copy, Check, MessageCircle, DollarSign, Tag } from 'lucide-react';
+import { Activity, Wallet, Receipt, User, Plus, X, ArrowRight, Copy, Check, MessageCircle, DollarSign, Tag, Database, Loader2 } from 'lucide-react';
 
-export default function BottomNav({ activeTab, onTabChange, usuario, telefone }) {
+export default function BottomNav({ activeTab, onTabChange, usuario, telefone, onRefreshDashboard }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tipoLancamento, setTipoLancamento] = useState('gasto'); // 'gasto' ou 'entrada'
   const [valorInput, setValorInput] = useState('');
   const [descricaoInput, setDescricaoInput] = useState('');
   const [copied, setCopied] = useState(false);
+  const [savingDb, setSavingDb] = useState(false);
+  const [saveStatus, setSaveStatus] = useState({ type: '', msg: '' });
 
   // Limpa apenas números do telefone do bot (ou usa fallback padrão)
   const numeroBot = telefone ? telefone.replace(/\D/g, '') : '';
@@ -28,6 +30,53 @@ export default function BottomNav({ activeTab, onTabChange, usuario, telefone })
     navigator.clipboard.writeText(comandoGerado);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleSaveDirectToDb = async () => {
+    if (!valorInput || !telefone) {
+      setSaveStatus({ type: 'error', msg: 'Informe um valor e certifique-se de ter um telefone consultado.' });
+      return;
+    }
+    setSavingDb(true);
+    setSaveStatus({ type: '', msg: '' });
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const resp = await fetch(`${API_BASE_URL}/api/transacao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telefone: numeroBot || telefone,
+          tipo: tipoLancamento,
+          valor: valorInput,
+          categoria: descricaoInput || (tipoLancamento === 'gasto' ? 'Gasto Web' : 'Entrada Web'),
+          descricao: descricaoInput || (tipoLancamento === 'gasto' ? 'Gasto via Dashboard' : 'Entrada via Dashboard')
+        })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.detail || data.message || 'Erro ao registrar transação no banco.');
+      }
+
+      setSaveStatus({ type: 'success', msg: data.message || 'Lançamento registrado com segurança!' });
+      setValorInput('');
+      setDescricaoInput('');
+      
+      // Atualiza o dashboard em tempo real após salvar
+      if (onRefreshDashboard) {
+        setTimeout(() => {
+          onRefreshDashboard();
+          setIsModalOpen(false);
+          setSaveStatus({ type: '', msg: '' });
+        }, 1600);
+      }
+    } catch (err) {
+      console.error('Erro no salvamento web:', err);
+      setSaveStatus({ type: 'error', msg: err.message || 'Não foi possível conectar ao Cérebro Python.' });
+    } finally {
+      setSavingDb(false);
+    }
   };
 
   return (
@@ -56,7 +105,7 @@ export default function BottomNav({ activeTab, onTabChange, usuario, telefone })
           {/* Botão Central Flutuante: [+] Novo Lançamento */}
           <div className="ref-nav-fab-wrapper">
             <button 
-              onClick={() => setIsModalOpen(true)} 
+              onClick={() => { setIsModalOpen(true); setSaveStatus({ type: '', msg: '' }); }} 
               className="ref-nav-fab"
               title="Novo Lançamento Rápido"
             >
@@ -99,8 +148,14 @@ export default function BottomNav({ activeTab, onTabChange, usuario, telefone })
             </div>
 
             <p className="ref-modal-desc">
-              Monte o lançamento aqui e envie com 1 clique diretamente para o seu WhatsApp conectado ao Cérebro do Porquinho!
+              Escolha abaixo como deseja registrar: salve <strong>diretamente e em segurança no banco relacional</strong> com 1 clique, ou envie pela conversa do WhatsApp!
             </p>
+
+            {saveStatus.msg && (
+              <div className={`modal-alert ${saveStatus.type === 'success' ? 'alert-success' : 'alert-error'}`}>
+                <span>{saveStatus.msg}</span>
+              </div>
+            )}
 
             <div className="ref-modal-type-selector">
               <button
@@ -152,9 +207,18 @@ export default function BottomNav({ activeTab, onTabChange, usuario, telefone })
             </div>
 
             <div className="ref-modal-actions">
+              <button 
+                onClick={handleSaveDirectToDb} 
+                className="db-save-btn"
+                disabled={savingDb}
+              >
+                {savingDb ? <Loader2 size={18} className="spinner-inline" /> : <Database size={18} />}
+                <span>{savingDb ? 'Salvando no Banco...' : '🚀 Salvar Direto no Banco (Web)'}</span>
+              </button>
+
               <button onClick={handleOpenWhatsApp} className="wa-send-btn">
                 <MessageCircle size={18} />
-                <span>{numeroBot ? 'Enviar no WhatsApp Agora' : 'Copiar Comando'}</span>
+                <span>{numeroBot ? '💬 Enviar pelo WhatsApp' : 'Copiar Comando'}</span>
                 <ArrowRight size={16} />
               </button>
             </div>

@@ -594,7 +594,7 @@ async def inserir_transacao(numero: str, dados: Dict[str, Any]):
     """
     if supabase is None:
         await enviar_mensagem_whatsapp(numero, "❌ Erro: Conexão com o banco de dados Supabase não configurada.")
-        return
+        return None
 
     try:
         # Garante ou recupera perfil do usuário no banco (com suporte a variações do 9º dígito)
@@ -627,12 +627,15 @@ async def inserir_transacao(numero: str, dados: Dict[str, Any]):
                 f"📝 *Descrição:* {dados['descricao']}"
             )
             await enviar_mensagem_whatsapp(numero, msg_sucesso)
+            return resposta_db.data
         else:
             await enviar_mensagem_whatsapp(numero, "❌ Erro ao salvar transação no banco de dados.")
+            return None
             
     except Exception as e:
         print(f"[ERRO] Erro no Supabase durante INSERT em financas_transacoes: {e}")
         await enviar_mensagem_whatsapp(numero, "❌ Erro interno ao tentar registrar sua transação no banco.")
+        return None
 
 
 async def gerar_e_enviar_relatorio_mensal(numero: str):
@@ -924,6 +927,80 @@ async def atualizar_nome_usuario(payload: Dict[str, Any]):
     except Exception as e:
         print(f"[ERRO] Erro ao atualizar nome via API: {e}")
         raise HTTPException(status_code=500, detail="Erro interno ao atualizar o nome do usuário.")
+
+
+@app.post("/api/transacao")
+async def criar_transacao_via_api(payload: Dict[str, Any]):
+    """
+    Endpoint blindado e seguro para registrar nova transação (gasto ou entrada) diretamente pelo Dashboard Web.
+    Garante validação estrita de tipos, isolamento ao usuário do telefone e executa APENAS INSERT em 'financas_transacoes'.
+    Envia recibo no WhatsApp via inserir_transacao.
+    """
+    if supabase is None:
+        raise HTTPException(status_code=503, detail="Serviço indisponível. Supabase não conectado.")
+
+    telefone = payload.get("telefone", "")
+    tipo = str(payload.get("tipo", "")).strip().lower()
+    valor_raw = payload.get("valor")
+    categoria = str(payload.get("categoria", "")).strip()
+    descricao = str(payload.get("descricao", "")).strip()
+
+    if not telefone:
+        raise HTTPException(status_code=400, detail="O número de WhatsApp (telefone) é obrigatório.")
+
+    if tipo not in ["gasto", "entrada"]:
+        raise HTTPException(status_code=400, detail="O tipo da transação deve ser estritamente 'gasto' ou 'entrada'.")
+
+    # Conversão e validação segura do valor monetário
+    try:
+        if isinstance(valor_raw, str):
+            valor_str = valor_raw.replace("R$", "").replace(" ", "").strip()
+            valor_str = valor_str.replace(".", "").replace(",", ".") if "," in valor_str and "." in valor_str else valor_str.replace(",", ".")
+            valor = float(valor_str)
+        else:
+            valor = float(valor_raw) if valor_raw is not None else 0.0
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="O valor da transação é inválido ou mal formatado.")
+
+    if valor <= 0:
+        raise HTTPException(status_code=400, detail="O valor da transação deve ser positivo e maior que zero.")
+
+    if not categoria and not descricao:
+        categoria = "Geral" if tipo == "gasto" else "Depósito"
+        descricao = categoria
+    elif not categoria:
+        categoria = descricao[:30].title()
+    elif not descricao:
+        descricao = categoria
+
+    try:
+        # Garante a existência do usuário no banco e normaliza número do perfil
+        usuario = await obter_ou_criar_usuario(str(telefone))
+        telefone_real = str(usuario.get("telefone", str(telefone)))
+
+        dados_transacao = {
+            "tipo": tipo,
+            "valor": round(valor, 2),
+            "categoria": categoria[:50],
+            "descricao": descricao[:100]
+        }
+
+        # Executa o INSERT blindado na tabela financas_transacoes e envia confirmação no WhatsApp
+        resultado = await inserir_transacao(telefone_real, dados_transacao)
+
+        if resultado is not None:
+            return {
+                "status": "success",
+                "message": f"✅ {tipo.title()} de {formatar_moeda(valor)} salvo com sucesso no banco de dados!",
+                "data": dados_transacao
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Não foi possível inserir o registro na tabela financas_transacoes.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERRO] Erro ao registrar transação via API: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno ao tentar salvar a transação no banco relacional.")
 
 
 # -----------------------------------------------------------------------------------------

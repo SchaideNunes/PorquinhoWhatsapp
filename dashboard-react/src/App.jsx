@@ -3,6 +3,8 @@ import Header from './components/Header';
 import SummaryCards from './components/SummaryCards';
 import CategoryChart from './components/CategoryChart';
 import TransactionsTable from './components/TransactionsTable';
+import BottomNav from './components/BottomNav';
+import AccountCard from './components/AccountCard';
 import { AlertCircle, PiggyBank } from 'lucide-react';
 import './App.css';
 
@@ -11,6 +13,7 @@ export default function App() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [activeTab, setActiveTab] = useState('resumo'); // 'resumo' | 'graficos' | 'extrato' | 'conta'
 
   // Obtém a URL da API (suporta VITE_API_URL no ambiente Vercel ou localhost no dev)
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -40,6 +43,7 @@ export default function App() {
         setErrorMsg(json.message || 'Número não cadastrado. Envie uma mensagem para o Porquinho no WhatsApp!');
       } else if (json.status === 'success') {
         setDados(json);
+        setActiveTab('resumo');
         // Atualiza a URL sem recarregar a página para facilidade de compartilhamento
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.set('telefone', numeroLimpo);
@@ -74,6 +78,7 @@ export default function App() {
     setTelefone('');
     setDados(null);
     setErrorMsg('');
+    setActiveTab('resumo');
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.delete('telefone');
     window.history.pushState({}, '', newUrl);
@@ -115,14 +120,55 @@ export default function App() {
       )}
 
       {!loading && dados && (
-        <>
-          <SummaryCards resumo={dados.resumo} />
-          
-          <div className="dashboard-grid">
-            <CategoryChart categorias={dados.categorias} />
-            <TransactionsTable transacoes={dados.transacoes} />
-          </div>
-        </>
+        <div className="tab-content-wrapper" style={{ paddingBottom: '5.5rem' }}>
+          {/* Aba Atividade (Resumo Completo) */}
+          {activeTab === 'resumo' && (
+            <div className="animate-fade-in">
+              <SummaryCards resumo={dados.resumo} />
+              <div className="dashboard-grid">
+                <CategoryChart categorias={dados.categorias} />
+                <TransactionsTable transacoes={dados.transacoes} />
+              </div>
+            </div>
+          )}
+
+          {/* Aba Orçamento (Foco em Gráficos e Divisão) */}
+          {activeTab === 'graficos' && (
+            <div className="animate-fade-in">
+              <SummaryCards resumo={dados.resumo} />
+              <div style={{ marginTop: '1.5rem' }}>
+                <CategoryChart categorias={dados.categorias} />
+              </div>
+            </div>
+          )}
+
+          {/* Aba Transações (Histórico Completo em Tela Inteira) */}
+          {activeTab === 'extrato' && (
+            <div className="animate-fade-in">
+              <SummaryCards resumo={dados.resumo} />
+              <div style={{ marginTop: '1.5rem' }}>
+                <TransactionsTable transacoes={dados.transacoes} />
+              </div>
+            </div>
+          )}
+
+          {/* Aba Conta (Perfil e Ações do Sistema) */}
+          {activeTab === 'conta' && (
+            <AccountCard
+              usuario={dados?.usuario}
+              telefone={telefone}
+              onReset={handleReset}
+            />
+          )}
+
+          {/* Barra Inferior de Navegação estilo Mobile App */}
+          <BottomNav
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            usuario={dados?.usuario}
+            telefone={telefone}
+          />
+        </div>
       )}
     </div>
   );

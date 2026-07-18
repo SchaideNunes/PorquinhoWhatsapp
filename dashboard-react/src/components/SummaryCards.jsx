@@ -21,7 +21,7 @@ export default function SummaryCards({ resumo }) {
   const isPositivo = saldo >= 0;
 
   return (
-    <div className="ref-budget-summary-card glass-card animate-fade-in">
+    <div className="ref-budget-summary-card animate-fade-in">
       {/* Top 3 colunas inspiradas no print: Budgeted / Spent / Left */}
       <div className="ref-budget-cols">
         <div className="ref-budget-col">

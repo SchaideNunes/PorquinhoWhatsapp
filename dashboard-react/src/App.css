@@ -344,12 +344,13 @@
   gap: 0.4rem;
 }
 
-/* Reference Budget Summary Card (Inspirado no print, com Nossa Paleta Oficial: Cyan / Emerald / Rose / Deep Navy) */
+/* Reference Budget Summary Card (Sem Efeito de Brilho, Limpo e Elegante) */
 .ref-budget-summary-card {
   padding: 1.25rem 1rem;
-  background: linear-gradient(135deg, rgba(26, 43, 76, 0.7), rgba(11, 16, 29, 0.9));
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 12px 32px -10px rgba(56, 189, 248, 0.18);
+  background: rgba(17, 29, 59, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xl);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   gap: 1rem;
